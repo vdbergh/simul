@@ -110,9 +110,11 @@ white between engines of "equal strength". Explicitly the RMS bias is
 the square root of the average of the squares of the biases expressed
 in Elo.
 
-7. We use the BayesElo model to generate realistic pentanomial
-frequencies. Therefore, our logistic input parameters `draw_ratio,
-bias, elo` have to be converted to the BayesElo model. Strategy:
+7. To perform simulations we need a method to obtain `realistic
+pentanomial frequencies`. To this end we use the BayesElo
+model. Therefore, our logistic input parameters `draw_ratio, bias,
+elo` have to be converted to the BayesElo model. We follow the
+following strategy:
 
   * Convert the `draw_ratio` to `draw_elo`, assuming equal strength
 engines.

@@ -293,9 +293,8 @@ void results_to_pdf(int results_in[], double *count, double pdf_out[]){
 void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
   /*
     This function computes the generalized log-likelihood ratio for
-    "results" which should be an array if length 5 which should
-    contain the frequencies of the game pairs
-    LL,LD+DL,LW+DD+WL,DW+WD,WW. 
+    "results" which should be an array if length 5 containing the
+    frequencies of the game pairs LL,LD+DL,LW+DD+WL,DW+WD,WW.
   */
   double pdf_out[2*N];
   double count;
@@ -306,18 +305,18 @@ void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
 /*
   We use the BayesElo model to generate realistic pentanomial
   frequencies. Therefore, our logistic input parameters have to be
-  converted to the BayesElo model. Steps:
+  converted to the BayesElo model. Strategy:
 
-  - Assume equal strength engines and convert the draw_ratio
-  to draw_elo.
+  - Convert the draw_ratio to draw_elo, assuming equal strength
+  engines.
 
   - Convert the bias expressed in logistic Elo to the advantage
   parameter in BayesElo using the standard scale factor. 
 
-  - Adjust the Elo of the BayesElo model in such a way that the score
-  as calculated with the associated pentanomial probabilities
-  correspond to the given logistic Elo. This requires numerically solving
-  an equation.
+  - Determine the Elo of the BayesElo model in such a way that the score
+  as calculated using pentanomial probabilities derived from this Elo,
+  corresponds to the given logistic Elo. This requires numerically solving
+  a suitable equation.
 */
 
 double draw_elo_calc(double draw_ratio){
@@ -386,7 +385,7 @@ void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage
 */
 
 void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
-	      int *status, int *duration){
+	      int *status, int *duration, int *invalid){
   int results[N]={0,0,0,0,0};
   double LA=log(beta/(1-alpha));
   double LB=log((1-beta)/alpha);
@@ -400,12 +399,15 @@ void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
   double o1=0.0;
   double score0=L_(elo0);
   double score1=L_(elo1);
+  int i;
   
   *duration=0;
   *status=CONTINUE;
+  *invalid=0;
+
   while(1){
     (*duration)++;
-    l=pick(pdf);
+    l=pick(pdf);   /* no locking as rand() is marked as thread safe in the man page */
     results[l]++;
     LLR_logistic(score0,score1,results, &LLR_);
     /* 
@@ -433,6 +435,14 @@ void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
       *status=H0;
     }
     if(*status!=CONTINUE){
+      /* The LLR computation is currently not designed to handle
+	 zero values correctly. */
+      for(i=0;i<N;i++){
+	if(results[i]==0){
+	  *invalid=1;
+	  break;
+	}
+      }
       break;
     }
   }
@@ -447,29 +457,33 @@ typedef struct sim {
   int    pass;
   int    count;
   double total_duration;
+  int    invalid;
 } sim_t;
 
 void *sim_function(void *args){
   while(1){
     int status;
     int duration;
+    int invalid;
     sim_t *sim_;
     sim_=(sim_t *)(args);
-    simulate(sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,&status,&duration);
+    simulate(sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
+	     &status,&duration,&invalid);
     duration*=2;
     pthread_mutex_lock(&mutex);
     sim_->total_duration+=duration;
-    if(status==1){
+    if(status==H1){
       (sim_->pass)++;
     }
     (sim_->count)++;
+    sim_->invalid+=invalid;
     pthread_mutex_unlock(&mutex);
   }
 }
 
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
-	 "[--draw_ratio DRAW_RATIO] [--bias BIAS]\n");
+	 "[--draw_ratio DRAW_RATIO] [--bias BIAS] [--threads THREADS]\n");
 }
 
 int main(int argc, char **argv){
@@ -481,6 +495,7 @@ int main(int argc, char **argv){
   int i;
   sim_t sim_;
   double av_duration;
+  double inv;
   for(i=1;i<=argc-1;i++){
     if(strcmp(argv[i],"-h")==0){
       usage();
@@ -575,8 +590,10 @@ int main(int argc, char **argv){
   printf("BayesElo\n");
   printf("========\n");
   printf("belo0      = %8.4f\nbelo1      = %8.4f\nbelo       = %8.4f\n"
-	 "draw_elo   = %8.4f\nadvantage  = %8.4f\n\n",
-	 belo0,belo1,belo,draw_elo,advantage);
+	 "draw_elo   = %8.4f\nadvantage  = %8.4f\n"
+	 "probs      =  [%f, %f, %f, %f, %f]\n\n",
+	 belo0,belo1,belo,draw_elo,advantage,
+	 pdf[1],pdf[3],pdf[5],pdf[7],pdf[9]);
   sim_.alpha=alpha;
   sim_.beta=beta;
   sim_.elo0=elo0;
@@ -585,6 +602,7 @@ int main(int argc, char **argv){
   sim_.pass=0;
   sim_.count=0;
   sim_.total_duration=0.0;
+  sim_.invalid=0;
   
   for(i=0;i<num_threads;i++){
     pthread_create(&(threads[i]), NULL, sim_function, (void*) (&sim_));
@@ -595,10 +613,11 @@ int main(int argc, char **argv){
       continue;
     }
     p=sim_.pass/(sim_.count+0.0);
+    inv=sim_.invalid/(sim_.count+0.0);
     av_duration=sim_.total_duration/sim_.count;
     /* 3 sigma */
     ci=3*sqrt(p*(1-p))/sqrt(sim_.count);
-    printf("%d %f[%f,%f] %.1f\n",sim_.count,p,p-ci,p+ci,av_duration);
+    printf("sims=%d pass=%f[%f,%f] length=%.1f invalid=%f\n",sim_.count,p,p-ci,p+ci,av_duration,inv);
     fflush(stdout);
   }
 }

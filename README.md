@@ -122,11 +122,12 @@ parameter in BayesElo using the standard scale factor.
 
   * Determine the Elo for the BayesElo model (`belo`) in such a way
 that the expected score as calculated using the pentanomial
-probabilities (`probs`) derived from `belo`, corresponds to the given logistic
-Elo (`elo`). This requires numerically solving a suitable equation.
+probabilities (`probs`) derived from `belo, draw_elo, advantage`,
+corresponds to the given logistic Elo (`elo`). This requires
+numerically solving a suitable equation.
 
 8. The LLR computation is currently not designed to handle zero
-outcomes entirely correctly.  Thich may happen with large draw_ratios
+outcomes entirely correctly.  This may happen with large draw_ratios
 and biases. The proportion of such occurencies is contained in the
 `invalid` field.
 

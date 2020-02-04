@@ -242,7 +242,7 @@ double pick(double pdf[]){
     }
   }
   /* we should not get here */
-  return pdf[2*N];
+  return pdf[2*(N-1)];
 }
 
 double LLR(double pdf_in[], double s0, double s1){

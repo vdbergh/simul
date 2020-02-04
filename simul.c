@@ -308,11 +308,7 @@ void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
   frequencies. Therefore, our logistic input parameters have to be
   converted to the BayesElo model. Strategy:
 
-  - Convert the draw_ratio to draw_elo, assuming equal strength
-  engines.
-
-  - Convert the bias expressed in logistic Elo to the advantage
-  parameter in BayesElo using the standard scale factor. 
+  - Convert (draw_ratio, bias) to (draw_elo, advantage).
 
   - Determine the Elo of the BayesElo model in such a way that the score
   as calculated using pentanomial probabilities derived from this Elo,
@@ -320,12 +316,14 @@ void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
   a suitable equation.
 */
 
-double draw_elo_calc(double draw_ratio){
-  return 400*(log(1/((1-draw_ratio)/2.0)-1)/log(10));
-}
-
-double scale(double de){
-  return 4*pow(10,(-de/400))/pow(1+pow(10,(-de/400)),2);
+void proba_to_bayeselo(double P[],double *belo,double *drawelo){
+  /*
+    Takes a probability: P[2], P[0]
+    Returns elo, drawelo.
+  */
+  assert(0<P[2]&&P[2]<1&&0<P[0]&&P[0]<1);
+  *belo=200*log10(P[2]/P[0]*(1-P[0])/(1-P[2]));
+  *drawelo=200*log10((1-P[0])/P[0]*(1-P[2])/P[2]);
 }
 
 void ldw_calc(double belo, double de, double ldw[]){
@@ -377,8 +375,12 @@ double elo_to_belo(double elo, double draw_elo, double advantage){
 }
 
 void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage){
-  *draw_elo=draw_elo_calc(draw_ratio);
-  *advantage=bias/scale(*draw_elo);
+  double P[3];
+  double bias_s=L_(bias);
+  P[2]=bias_s-draw_ratio/2;
+  P[1]=draw_ratio;
+  P[0]=1.0-P[1]-P[2];
+  proba_to_bayeselo(P,advantage,draw_elo);
 }
 
 /*
@@ -587,6 +589,10 @@ int main(int argc, char **argv){
   srand(time(0));
   num_threads=MIN(num_threads,MAX_THREADS);
   num_threads=MAX(num_threads,1);
+  if (draw_ratio/2>=MIN(L_(bias),1-L_(bias))){
+    printf("The bias and the draw_ratio are not compatible.\n");
+    return 0;
+  }
   printf("Design parameters\n");
   printf("=================\n");
   printf("alpha      = %8.4f\nbeta       = %8.4f\nelo0       = %8.4f\n"

@@ -17,7 +17,7 @@ http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
 
 ```
 $ ./simul -h
-simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--threads THREADS]
+simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--overshoot OVERSHOOT] [--threads THREADS]
 
 $ ./simul --elo0 0 --elo1 2 --elo 0 --draw_ratio 0.74 --bias 300 --threads 4
 
@@ -30,6 +30,7 @@ elo1       =   2.0000
 elo        =   0.0000
 draw_ratio =   0.7400
 bias       = 300.0000
+overshoot  =   1
 threads    =   4
 
 BayesElo
@@ -70,6 +71,7 @@ elo1       =   2.0000
 elo        =   2.0000
 draw_ratio =   0.7400
 bias       = 300.0000
+overshoot  =   1
 threads    =   4
 
 BayesElo

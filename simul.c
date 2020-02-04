@@ -385,7 +385,7 @@ void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage
 */
 
 void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
-	      int *status, int *duration, int *invalid){
+	      int overshoot,int *status,int *duration,int *invalid){
   int results[N]={0,0,0,0,0};
   double LA=log(beta/(1-alpha));
   double LB=log((1-beta)/alpha);
@@ -424,11 +424,10 @@ void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
       min_LLR=LLR_;
       o0=-sq0/LLR_/2;
     }
-    /*
-       Comment in the statement below to disable 
-       overshoot correction.
+    assert(overshoot==0 || overshoot==1);
+    if(!overshoot){
        o0=0;o1=0;
-    */
+    }
     if(LLR_>LB-o1){
       *status=H1;
     }else if(LLR_ < LA+o0){
@@ -454,8 +453,10 @@ typedef struct sim {
   double elo0;
   double elo1;
   double *pdf;
-  int    pass;
+  int    overshoot;
+  /* out data */
   int    count;
+  int    pass;
   double total_duration;
   int    invalid;
 } sim_t;
@@ -468,7 +469,7 @@ void *sim_function(void *args){
     sim_t *sim_;
     sim_=(sim_t *)(args);
     simulate(sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
-	     &status,&duration,&invalid);
+	     sim_->overshoot,&status,&duration,&invalid);
     duration*=2;
     pthread_mutex_lock(&mutex);
     sim_->total_duration+=duration;
@@ -483,7 +484,8 @@ void *sim_function(void *args){
 
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
-	 "[--draw_ratio DRAW_RATIO] [--bias BIAS] [--threads THREADS]\n");
+	 "[--draw_ratio DRAW_RATIO] [--bias BIAS] [--overshoot OVERSHOOT] "
+	 "[--threads THREADS]\n");
 }
 
 int main(int argc, char **argv){
@@ -492,6 +494,7 @@ int main(int argc, char **argv){
   double belo,belo0,belo1,draw_elo,advantage;
   double pdf[2*N];
   int num_threads=1;
+  int overshoot=1;
   int i;
   sim_t sim_;
   double av_duration;
@@ -564,12 +567,20 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
+    }else if(strcmp(argv[i],"--overshoot")==0){
+      if(i<argc-1){
+	overshoot=(int)(strtof(argv[i+1],NULL));
+	i++;
+      }else{
+	usage();
+	return 0;
+      }
     }else{
       usage();
       return 0;
     }
   }
-  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0){
+  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1)){
     usage();
     return 0;
   }
@@ -580,8 +591,8 @@ int main(int argc, char **argv){
   printf("=================\n");
   printf("alpha      = %8.4f\nbeta       = %8.4f\nelo0       = %8.4f\n"
 	 "elo1       = %8.4f\nelo        = %8.4f\ndraw_ratio = %8.4f\n"
-	 "bias       = %8.4f\nthreads    = %3d\n\n",
-	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,num_threads);
+	 "bias       = %8.4f\novershoot  = %3d\nthreads    = %3d\n\n",
+	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
   belo=elo_to_belo(elo,draw_elo,advantage);
   belo0=elo_to_belo(elo0,draw_elo,advantage);
@@ -603,6 +614,7 @@ int main(int argc, char **argv){
   sim_.count=0;
   sim_.total_duration=0.0;
   sim_.invalid=0;
+  sim_.overshoot=overshoot;
   
   for(i=0;i<num_threads;i++){
     pthread_create(&(threads[i]), NULL, sim_function, (void*) (&sim_));

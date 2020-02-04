@@ -507,7 +507,7 @@ int main(int argc, char **argv){
       return 0;
     }else if(strcmp(argv[i],"--alpha")==0){
       if(i<argc-1){
-	alpha=strtof(argv[i+1],NULL);
+	alpha=atof(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -515,7 +515,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--beta")==0){
       if(i<argc-1){
-	beta=strtof(argv[i+1],NULL);
+	beta=atof(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -523,7 +523,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--elo0")==0){
       if(i<argc-1){
-	elo0=strtof(argv[i+1],NULL);
+	elo0=atof(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -531,7 +531,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--elo1")==0){
       if(i<argc-1){
-	elo1=strtof(argv[i+1],NULL);
+	elo1=atof(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -539,7 +539,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--elo")==0){
       if(i<argc-1){
-	elo=strtof(argv[i+1],NULL);
+	elo=atof(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -547,7 +547,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--draw_ratio")==0){
       if(i<argc-1){
-	draw_ratio=strtof(argv[i+1],NULL);
+	draw_ratio=atof(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -555,7 +555,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--bias")==0){
       if(i<argc-1){
-	bias=strtof(argv[i+1],NULL);
+	bias=atof(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -563,7 +563,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--threads")==0){
       if(i<argc-1){
-	num_threads=(int)(strtof(argv[i+1],NULL));
+	num_threads=atoi(argv[i+1]);
 	i++;
       }else{
 	usage();
@@ -571,7 +571,7 @@ int main(int argc, char **argv){
       }
     }else if(strcmp(argv[i],"--overshoot")==0){
       if(i<argc-1){
-	overshoot=(int)(strtof(argv[i+1],NULL));
+	overshoot=atoi(argv[i+1]);
 	i++;
       }else{
 	usage();

@@ -191,7 +191,7 @@ double f(double x, void *args){
   return sum;
 }
 
-void MLE(double pdf_in[], double s, double pdf_out[]){
+void MLE(double pdf_in[], double s, double pdf_out[], int *invalid){
   /*
     This function computes the maximum likelood estimate for a
     discrete distribution with expectation value s, given an observed
@@ -213,13 +213,19 @@ void MLE(double pdf_in[], double s, double pdf_out[]){
   stats_t stats={0,0,0};
   int i;
   p_t ps;
+  *invalid=0;
   v=pdf_in[0];
   w=pdf_in[2*(N-1)];
   l=-1/(w-s);
   u=1/(s-v);
   ps.s=s;
   ps.pdf_in=pdf_in;
+  if(f(l+epsilon,&ps)*f(u-epsilon,&ps)>0){
+    *invalid=1;
+    return;
+  }
   x=brentq(f,l+epsilon,u-epsilon,epsilon,epsilon,1000,&stats,&ps);
+  assert(stats.error_num==0);
   for(i=0;i<N;i++){
     a=pdf_in[2*i];
     p=pdf_in[2*i+1];
@@ -227,6 +233,7 @@ void MLE(double pdf_in[], double s, double pdf_out[]){
     pdf_out[2*i+1]=p/(1+x*(a-s));
   }
   muvar(pdf_out,&mu,&var); /* for validation */
+  /*  printf("probs=[%f, %f, %f, %f, %f] s=%f mu=%f\n",pdf_out[1],pdf_out[3],pdf_out[5],pdf_out[7],pdf_out[9],s,mu);*/
   assert(fabs(s-mu)<1e-6);
 }
 
@@ -244,18 +251,26 @@ double pick(double pdf[]){
   return pdf[2*N];
 }
 
-double LLR(double pdf_in[], double s0, double s1){
+double LLR(double pdf_in[], double s0, double s1, int *invalid){
   double pdf0[2*N], pdf1[2*N];
+  int invalid0,invalid1;
   double p,p0,p1;
   double sum=0.0;
   int i;
-  MLE(pdf_in,s0,pdf0);
-  MLE(pdf_in,s1,pdf1);
+  *invalid=0;
+  MLE(pdf_in,s0,pdf0,&invalid0);
+  MLE(pdf_in,s1,pdf1,&invalid1);
+  if (invalid0 || invalid1){
+    *invalid=1;
+    return 0.0;
+  }
   for(i=0;i<N;i++){
     p=pdf_in[2*i+1];
     p0=pdf0[2*i+1];
     p1=pdf1[2*i+1];
-    sum+=p*log(p1/p0);
+    if(p!=0){
+      sum+=p*log(p1/p0);
+    }
   }
   return sum;
 }
@@ -265,7 +280,7 @@ void regularize(int results_in[], double results_out[]){
      Replace zeros with a small value to avoid division by
      zero later on.
   */
-  double epsilon=1e-3;
+  double epsilon=0.0;
   int i;
   for(i=0; i<N; i++){
     if(results_in[i]==0){
@@ -290,7 +305,7 @@ void results_to_pdf(int results_in[], double *count, double pdf_out[]){
   }
 }
     
-void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
+void LLR_logistic(double s0, double s1, int results_in[], double *LLR_, int *invalid){
   /*
     This function computes the generalized log-likelihood ratio for
     "results" which should be an array if length 5 containing the
@@ -299,7 +314,7 @@ void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
   double pdf_out[2*N];
   double count;
   results_to_pdf(results_in, &count, pdf_out);
-  *LLR_=count*LLR(pdf_out,s0,s1);
+  *LLR_=count*LLR(pdf_out,s0,s1,invalid);
 }
 
 /*
@@ -399,17 +414,15 @@ void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
   double o1=0.0;
   double score0=L_(elo0);
   double score1=L_(elo1);
-  int i;
   
   *duration=0;
   *status=CONTINUE;
-  *invalid=0;
-
   while(1){
     (*duration)++;
     l=pick(pdf);   /* no locking as rand() is marked as thread safe in the man page */
     results[l]++;
-    LLR_logistic(score0,score1,results, &LLR_);
+    LLR_logistic(score0,score1,results, &LLR_,invalid);
+    assert(*invalid==0 || *invalid==1);
     /* 
        Dynamic overshoot correction using
        Siegmund - Sequential Analysis - Corollary 8.33.
@@ -434,14 +447,6 @@ void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
       *status=H0;
     }
     if(*status!=CONTINUE){
-      /* The LLR computation is currently not designed to handle
-	 zero values correctly. */
-      for(i=0;i<N;i++){
-	if(results[i]==0){
-	  *invalid=1;
-	  break;
-	}
-      }
       break;
     }
   }

@@ -8,7 +8,7 @@
 #include <string.h>
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-#define MAX_THREADS 16
+#define MAX_THREADS 128
 pthread_t threads[MAX_THREADS];
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -457,7 +457,8 @@ typedef struct sim {
   double elo1;
   double *pdf;
   int    overshoot;
-  /* out data */
+  /* in/out data */
+  volatile int    stop;
   volatile int    count;
   volatile int    pass;
   volatile double total_duration;
@@ -465,12 +466,13 @@ typedef struct sim {
 } sim_t;
 
 void *sim_function(void *args){
-  while(1){
+  sim_t *sim_;
+  sim_=(sim_t *)(args);
+  assert(sim_->stop==0 || sim_->stop==1);
+  while(!sim_->stop){
     int status;
     int duration;
     int invalid;
-    sim_t *sim_;
-    sim_=(sim_t *)(args);
     simulate(sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
 	     sim_->overshoot,&status,&duration,&invalid);
     duration*=2;
@@ -483,12 +485,13 @@ void *sim_function(void *args){
     sim_->invalid+=invalid;
     pthread_mutex_unlock(&mutex);
   }
+  return NULL;
 }
 
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
 	 "[--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
-	 "[--threads THREADS]\n");
+	 "[--threads THREADS] [--truncate TRUNCATE]\n");
 }
 
 int main(int argc, char **argv){
@@ -502,6 +505,7 @@ int main(int argc, char **argv){
   sim_t sim_;
   double av_duration;
   double inv;
+  int truncate=0;
   for(i=1;i<=argc-1;i++){
     if(strcmp(argv[i],"-h")==0){
       usage();
@@ -570,6 +574,17 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
+    }else if(strcmp(argv[i],"--truncate")==0){
+      if(i<argc-1){
+	truncate=atoi(argv[i+1]);
+	if(truncate==0){ /* hack */
+	  truncate=1;
+	}
+	i++;
+      }else{
+	usage();
+	return 0;
+      }
     }else if(strcmp(argv[i],"--noovcor")==0){
       overshoot=0;
     }else{
@@ -592,8 +607,9 @@ int main(int argc, char **argv){
   printf("=================\n");
   printf("alpha      = %8.4f\nbeta       = %8.4f\nelo0       = %8.4f\n"
 	 "elo1       = %8.4f\nelo        = %8.4f\ndraw_ratio = %8.4f\n"
-	 "bias       = %8.4f\novcor      = %3d\nthreads    = %3d\n\n",
-	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads);
+	 "bias       = %8.4f\n"
+	 "ovcor      = %3d\nthreads    = %3d\ntruncate   =   %d\n\n",
+	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
   belo=elo_to_belo(elo,draw_elo,advantage);
   belo0=elo_to_belo(elo0,draw_elo,advantage);
@@ -611,8 +627,9 @@ int main(int argc, char **argv){
   sim_.elo0=elo0;
   sim_.elo1=elo1;
   sim_.pdf=pdf;
-  sim_.pass=0;
+  sim_.stop=0;
   sim_.count=0;
+  sim_.pass=0;
   sim_.total_duration=0.0;
   sim_.invalid=0;
   sim_.overshoot=overshoot;
@@ -632,6 +649,13 @@ int main(int argc, char **argv){
     ci=3*sqrt(p*(1-p))/sqrt(sim_.count);
     printf("sims=%d pass=%f[%f,%f] length=%.1f zeros=%f\n",sim_.count,p,p-ci,p+ci,av_duration,inv);
     fflush(stdout);
+    if(truncate!=0 && sim_.count>=truncate){
+      sim_.stop=1;
+      for(i=0;i<num_threads;i++){
+	pthread_join(threads[i], NULL);
+      }
+      break;
+    }
   }
 }
 

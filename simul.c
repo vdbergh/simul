@@ -450,6 +450,7 @@ void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
 }
 
 typedef struct sim {
+  /* identical for every thread */
   double alpha;
   double beta;
   double elo0;
@@ -457,10 +458,10 @@ typedef struct sim {
   double *pdf;
   int    overshoot;
   /* out data */
-  int    count;
-  int    pass;
-  double total_duration;
-  int    invalid;
+  volatile int    count;
+  volatile int    pass;
+  volatile double total_duration;
+  volatile int    invalid;
 } sim_t;
 
 void *sim_function(void *args){

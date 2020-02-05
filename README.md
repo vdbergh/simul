@@ -17,7 +17,7 @@ http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
 
 ```
 $ ./simul -h
-simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--overshoot OVERSHOOT] [--threads THREADS]
+simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] [--threads THREADS]
 
 $  ./simul --elo0 0 --elo1 2 --draw_ratio 0.56 --elo 2 --bias 90 --threads 4
 Design parameters
@@ -29,7 +29,7 @@ elo1       =   2.0000
 elo        =   2.0000
 draw_ratio =   0.5600
 bias       =  90.0000
-overshoot  =   1
+ovcor      =   1
 threads    =   4
 
 BayesElo
@@ -67,7 +67,7 @@ elo1       =   2.0000
 elo        =   0.0000
 draw_ratio =   0.5600
 bias       =  90.0000
-overshoot  =   1
+ovcor      =   1
 threads    =   4
 
 BayesElo
@@ -113,7 +113,7 @@ model. Therefore, our logistic input parameters `draw_ratio, bias,
 elo` have to be converted to the BayesElo model. We follow the
 following strategy:
 
-  * Convert (draw_ratio, bias) to (draw_elo, advantage).
+  * Convert `(draw_ratio, bias)` to `(draw_elo, advantage)`.
 
   * Determine the Elo for the BayesElo model (`belo`) in such a way
 that the expected score as calculated using the pentanomial

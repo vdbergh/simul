@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <pthread.h>
 #include <assert.h>
 #include <math.h>
@@ -231,8 +232,26 @@ void MLE(double pdf_in[], double s, double pdf_out[]){
   assert(fabs(s-mu)<1e-6);
 }
 
-double pick(double pdf[]){
-  double x = (float)rand()/(float)(RAND_MAX);
+double myrand(uint64_t *prng){
+  /*
+    https://nuclear.llnl.gov/CNP/rng/rngman/node4.html
+  */
+  uint64_t a=UINT64_C(2862933555777941757);
+  uint64_t b=UINT64_C(3037000493);
+  uint64_t current=*prng;
+  *prng=a*(*prng)+b;
+  return current/pow(2,64);
+}
+
+void jump(uint64_t *prng){
+  /* do 2^48 steps */
+  uint64_t a=UINT64_C(3311271626024157185);
+  uint64_t b=UINT64_C(8774982398954700800);
+  *prng=a*(*prng)+b;
+}
+
+double pick(uint64_t *prng, double pdf[]){
+  double x = myrand(prng);
   int i;
   double s=0.0;
   for(i=0;i<N;i++){
@@ -387,8 +406,8 @@ void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage
   End of BayesElo conversion.
 */
 
-void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
-	      int overshoot,int *status,int *duration,int *invalid){
+void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
+	      double pdf[],int overshoot,int *status,int *duration,int *invalid){
   int results[N]={0,0,0,0,0};
   double LA=log(beta/(1-alpha));
   double LB=log((1-beta)/alpha);
@@ -410,7 +429,7 @@ void simulate(double alpha,double beta,double elo0,double elo1,double pdf[],
 
   while(1){
     (*duration)++;
-    l=pick(pdf);   /* no locking as rand() is marked as thread safe in the man page */
+    l=pick(prng,pdf);
     results[l]++;
     LLR_logistic(score0,score1,results, &LLR_);
     /* 
@@ -458,22 +477,28 @@ typedef struct sim {
   double *pdf;
   int    overshoot;
   /* in/out data */
-  volatile int    stop;
-  volatile int    count;
-  volatile int    pass;
-  volatile double total_duration;
-  volatile int    invalid;
+           uint64_t prng;
+  volatile int      stop;
+  volatile int      count;
+  volatile int      pass;
+  volatile double   total_duration;
+  volatile int      invalid;
 } sim_t;
 
 void *sim_function(void *args){
   sim_t *sim_;
   sim_=(sim_t *)(args);
+  uint64_t prng;
+  pthread_mutex_lock(&mutex);
+  jump(&(sim_->prng));
+  prng=sim_->prng;
+  pthread_mutex_unlock(&mutex);
   assert(sim_->stop==0 || sim_->stop==1);
   while(!sim_->stop){
     int status;
     int duration;
     int invalid;
-    simulate(sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
+    simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
 	     sim_->overshoot,&status,&duration,&invalid);
     duration*=2;
     pthread_mutex_lock(&mutex);
@@ -596,7 +621,6 @@ int main(int argc, char **argv){
     usage();
     return 0;
   }
-  srand(time(0));
   num_threads=MIN(num_threads,MAX_THREADS);
   num_threads=MAX(num_threads,1);
   if (draw_ratio/2>=MIN(L_(bias),1-L_(bias))){
@@ -633,6 +657,7 @@ int main(int argc, char **argv){
   sim_.total_duration=0.0;
   sim_.invalid=0;
   sim_.overshoot=overshoot;
+  sim_.prng=(uint64_t) time(0);
   
   for(i=0;i<num_threads;i++){
     pthread_create(&(threads[i]), NULL, sim_function, (void*) (&sim_));

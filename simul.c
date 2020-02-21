@@ -196,9 +196,9 @@ void MLE(double pdf_in[], double s, double pdf_out[]){
   /*
     This function computes the maximum likelood estimate for a
     discrete distribution with expectation value s, given an observed
-    (i.e. empirical) distribution pdf.
+    (i.e. empirical) distribution pdf_in.
     
-    pdf is an array[2*N] consisting of pairs (ai,pi), i=1,...,N.  It
+    pdf_in is an array[2*N] consisting of pairs (ai,pi), i=1,...,N.  It
     is assumed that that the ai are strictly ascending, a1<s<aN and
     p1>0, pN>0.
     
@@ -313,7 +313,7 @@ void results_to_pdf(int results_in[], double *count, double pdf_out[]){
 void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
   /*
     This function computes the generalized log-likelihood ratio for
-    "results" which should be an array if length 5 containing the
+    "results_in" which should be an array if length 5 containing the
     frequencies of the game pairs LL,LD+DL,LW+DD+WL,DW+WD,WW.
   */
   double pdf_out[2*N];

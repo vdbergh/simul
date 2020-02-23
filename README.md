@@ -116,25 +116,9 @@ of the squares of the biases expressed in Elo. In the simulation we
 assume that every opening has the same bias. One may show that in
 first approximation this is correct.
 
-9. ### Summary of parameters
-
-| Parameter | Explanation |
-| --------- | ----------- |
-| Elo       | Actual Elo (difference) |
-| Elo0      | H0 corresponds to Elo=Elo0 |
-| Elo1      | H1 corresponds to Elo=Elo1 |
-| alpha     | Pass probability if H0 is true |
-| beta     | Pass probability if H1 is true |
-| draw_ratio | Draw ratio between equal strength engines (taking into account the opening book) |
-| bias       | A proxy for `RMS bias` |
-| noovcor       | A flag to disable dynamic overshoot correction (for testing) |
-| threads       | Simultaneous runs |
-| truncate      | Stop the simulation after this many runs |
-
-
-10. To perform simulations we need a method to obtain `realistic
-pentanomial frequencies`. To this end we use the BayesElo
-model. Therefore, our logistic input parameters `draw_ratio, bias,
+9. To perform simulations we need a method to obtain `realistic
+pentanomial frequencies`. To this end we use the [BayesElo
+model](https://www.remi-coulom.fr/Bayesian-Elo/#theory). Therefore, our logistic input parameters `draw_ratio, bias,
 elo` have to be converted to the BayesElo model. We follow the
 following strategy:
 
@@ -142,14 +126,32 @@ following strategy:
 
   * Determine the Elo for the BayesElo model (`belo`) in such a way
 that the expected score as calculated using the pentanomial
-probabilities (`probs`) derived from `belo, draw_elo, advantage`,
+probabilities derived from `belo, draw_elo, advantage`,
 corresponds to the given logistic Elo (`elo`). This requires
 numerically solving a suitable equation.
 
-11. The theoretical guarantees of the GSPRT are asymptotic.
+10. The theoretical guarantees of the GSPRT are asymptotic.
 It does not work so well for very low outcome values.
 The proportion of zero outcomes for LD, LW+DD, DW is contained in the
-`zeros` field.
+`zeros` output field.
 
-12. We perform dynamic overshoot correction using `Siegmund -
-Sequential Analysis - Corollary 8.33`.
+11. We perform `dynamic overshoot correction` using `Siegmund -
+Sequential Analysis - Corollary 8.33`. For a rough introduction
+see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
+
+## Summary of parameters
+
+| Parameter | Explanation |
+| --------- | ----------- |
+| Elo       | Actual Elo (difference) |
+| Elo0      | H0 corresponds to Elo=Elo0 |
+| Elo1      | H1 corresponds to Elo=Elo1 |
+| alpha     | Pass probability if H0 is true |
+| beta     | Fail probability if H1 is true |
+| draw_ratio | Draw ratio between equal strength engines (taking into account the opening book) |
+| bias       | A proxy for `RMS bias` |
+| noovcor       | A flag to disable dynamic overshoot correction (for testing) |
+| threads       | Simultaneous runs |
+| truncate      | Stop the simulation after this many runs |
+
+

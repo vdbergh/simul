@@ -1,8 +1,12 @@
 ## A multi-threaded pentanomial simulator in C
 
 1. The simulator implements a GSPRT for the `pentanomial model`.
-It follows the [Fishtest](https://tests.stockfishchess.org/tests)
-[implementation](https://github.com/glinscott/fishtest).
+It follows the [Fishtest implementation](https://github.com/glinscott/fishtest). The simulator
+is not particularly optimized (in order not to obscure the
+code too much) but it is fast enough to simulate tens of millions
+of tests with realistic bounds (e.g. {0,2} in logistic Elo)
+in a reasonable time frame. This is enough to measure pass
+probabilities with 4 decimal digits.
 
 2. The theoretical basis for the GSPRT is:
 
@@ -143,9 +147,9 @@ see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
 
 | Parameter | Explanation |
 | --------- | ----------- |
-| Elo       | Actual Elo (difference) |
-| Elo0      | H0 corresponds to Elo=Elo0 |
-| Elo1      | H1 corresponds to Elo=Elo1 |
+| elo       | Actual Elo (difference) |
+| elo0      | H0 corresponds to Elo=Elo0 |
+| elo1      | H1 corresponds to Elo=Elo1 |
 | alpha     | Pass probability if H0 is true |
 | beta     | Fail probability if H1 is true |
 | draw_ratio | Draw ratio between equal strength engines (taking into account the opening book) |

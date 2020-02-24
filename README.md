@@ -108,9 +108,7 @@ sims=2607 pass=0.052551[0.039440,0.065661] length=60097.2 zeros=0.000000
 sims=2818 pass=0.052874[0.040228,0.065521] length=60006.6 zeros=0.000000
 ...
 ```
-7. All inputs for the simulator are in logistic Elo.
-
-8. The `bias` parameter is a proxy for the `RMS bias` of the opening
+7. The `bias` parameter is a proxy for the `RMS bias` of the opening
 book.  The RMS bias is the Root Mean Square of the biases of the
 openings in the book where the bias of an opening is defined as the
 conversion to Elo (using the standard logistic formula) of the
@@ -120,11 +118,12 @@ of the squares of the biases expressed in Elo. In the simulation we
 assume that every opening has the same bias. One may show that in
 first approximation this is correct.
 
-9. To perform simulations we need a method to obtain `realistic
-pentanomial frequencies`. To this end we use the [BayesElo
-model](https://www.remi-coulom.fr/Bayesian-Elo/#theory). Therefore, our logistic input parameters `draw_ratio, bias,
-elo` have to be converted to the BayesElo model. We follow the
-following strategy:
+8. The command line arguments for the simulator are in logistic Elo but to perform
+simulations we need a method to obtain `realistic pentanomial
+frequencies`. To this end invoke the [BayesElo
+model](https://www.remi-coulom.fr/Bayesian-Elo/#theory) internally. Therefore,
+our logistic input parameters `draw_ratio, bias, elo` have to be
+converted to the BayesElo model. We follow the following strategy:
 
   * Convert `(draw_ratio, bias)` to `(draw_elo, advantage)`.
 
@@ -134,12 +133,12 @@ probabilities derived from `belo, draw_elo, advantage`,
 corresponds to the given logistic Elo (`elo`). This requires
 numerically solving a suitable equation.
 
-10. The theoretical guarantees of the GSPRT are asymptotic.
+9. The theoretical guarantees of the GSPRT are asymptotic.
 It does not work so well for very low outcome values.
 The proportion of zero outcomes for LD, LW+DD, DW is contained in the
 `zeros` output field.
 
-11. We perform `dynamic overshoot correction` using `Siegmund -
+10. We perform `dynamic overshoot correction` using `Siegmund -
 Sequential Analysis - Corollary 8.33`. For a rough introduction
 see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
 

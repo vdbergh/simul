@@ -310,7 +310,7 @@ void results_to_pdf(int results_in[], double *count, double pdf_out[]){
   }
 }
     
-void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
+double LLR_logistic(double s0, double s1, int results_in[]){
   /*
     This function computes the generalized log-likelihood ratio for
     "results_in" which should be an array if length 5 containing the
@@ -319,7 +319,7 @@ void LLR_logistic(double s0, double s1, int results_in[], double *LLR_){
   double pdf_out[2*N];
   double count;
   results_to_pdf(results_in, &count, pdf_out);
-  *LLR_=count*LLR(pdf_out,s0,s1);
+  return count*LLR(pdf_out,s0,s1);
 }
 
 /*
@@ -431,7 +431,7 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
     (*duration)++;
     l=pick(prng,pdf);
     results[l]++;
-    LLR_logistic(score0,score1,results, &LLR_);
+    LLR_=LLR_logistic(score0,score1,results);
     /* 
        Dynamic overshoot correction using
        Siegmund - Sequential Analysis - Corollary 8.33.

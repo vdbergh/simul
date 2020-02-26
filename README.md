@@ -20,11 +20,7 @@ http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
 [SPRT calculator](https://tests.stockfishchess.org/html/SPRTcalculator.html) used by
 [Fishtest](https://tests.stockfishchess.org/tests).
 
-5. Compile command:
-
-```gcc -Wall -O3 simul.c -lm -lpthread -o simul```
-
-6. Sample usage:
+5. Sample usage:
 
 ```
 $ ./simul -h
@@ -108,7 +104,7 @@ sims=2607 pass=0.052551[0.039440,0.065661] length=60097.2 zeros=0.000000
 sims=2818 pass=0.052874[0.040228,0.065521] length=60006.6 zeros=0.000000
 ...
 ```
-7. The `bias` parameter is a proxy for the `RMS bias` of the opening
+6. The `bias` parameter is a proxy for the `RMS bias` of the opening
 book.  The RMS bias is the Root Mean Square of the biases of the
 openings in the book where the bias of an opening is defined as the
 conversion to Elo (using the standard logistic formula) of the
@@ -118,7 +114,7 @@ of the squares of the biases expressed in Elo. In the simulation we
 assume that every opening has the same bias. One may show that in
 first approximation this is correct.
 
-8. The command line arguments for the simulator are in logistic Elo but to perform
+7. The command line arguments for the simulator are in logistic Elo but to perform
 simulations we need a method to obtain `realistic pentanomial
 frequencies`. To this end invoke the [BayesElo
 model](https://www.remi-coulom.fr/Bayesian-Elo/#theory) internally. Therefore,
@@ -133,12 +129,12 @@ probabilities derived from `belo, draw_elo, advantage`,
 corresponds to the given logistic Elo (`elo`). This requires
 numerically solving a suitable equation.
 
-9. The theoretical guarantees of the GSPRT are asymptotic.
+8. The theoretical guarantees of the GSPRT are asymptotic.
 It does not work so well for very low outcome values.
 The proportion of zero outcomes for LD, LW+DD, DW is contained in the
 `zeros` output field.
 
-10. We perform `dynamic overshoot correction` using `Siegmund -
+9. We perform `dynamic overshoot correction` using `Siegmund -
 Sequential Analysis - Corollary 8.33`. For a rough introduction
 see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
 

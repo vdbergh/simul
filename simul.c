@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_THREADS 128
@@ -531,6 +532,7 @@ int main(int argc, char **argv){
   double av_duration;
   double inv;
   int truncate=0;
+  uint64_t seed=(uint64_t) time(0);
   for(i=1;i<=argc-1;i++){
     if(strcmp(argv[i],"-h")==0){
       usage();
@@ -632,8 +634,9 @@ int main(int argc, char **argv){
   printf("alpha      = %8.4f\nbeta       = %8.4f\nelo0       = %8.4f\n"
 	 "elo1       = %8.4f\nelo        = %8.4f\ndraw_ratio = %8.4f\n"
 	 "bias       = %8.4f\n"
-	 "ovcor      = %3d\nthreads    = %3d\ntruncate   =   %d\n\n",
-	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate);
+	 "ovcor      = %3d\nthreads    = %3d\ntruncate   =   %d\n"
+	 "seed       = %" PRIu64 "\n\n",
+	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,seed);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
   belo=elo_to_belo(elo,draw_elo,advantage);
   belo0=elo_to_belo(elo0,draw_elo,advantage);
@@ -657,7 +660,7 @@ int main(int argc, char **argv){
   sim_.total_duration=0.0;
   sim_.invalid=0;
   sim_.overshoot=overshoot;
-  sim_.prng=(uint64_t) time(0);
+  sim_.prng=seed;
   
   for(i=0;i<num_threads;i++){
     pthread_create(&(threads[i]), NULL, sim_function, (void*) (&sim_));

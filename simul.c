@@ -517,7 +517,7 @@ void *sim_function(void *args){
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
 	 "[--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
-	 "[--threads THREADS] [--truncate TRUNCATE]\n");
+	 "[--threads THREADS] [--truncate TRUNCATE] [--seed SEED]\n");
 }
 
 int main(int argc, char **argv){
@@ -612,6 +612,14 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
+    }else if(strcmp(argv[i],"--seed")==0){
+      if(i<argc-1){
+	seed=strtoull(argv[i+1],NULL,0);
+	i++;
+      }else{
+	usage();
+	return 0;
+      }
     }else if(strcmp(argv[i],"--noovcor")==0){
       overshoot=0;
     }else{
@@ -635,7 +643,7 @@ int main(int argc, char **argv){
 	 "elo1       = %8.4f\nelo        = %8.4f\ndraw_ratio = %8.4f\n"
 	 "bias       = %8.4f\n"
 	 "ovcor      = %3d\nthreads    = %3d\ntruncate   =   %d\n"
-	 "seed       = %" PRIu64 "\n\n",
+	 "seed       =   %" PRIu64 "\n\n",
 	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,seed);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
   belo=elo_to_belo(elo,draw_elo,advantage);

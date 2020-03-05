@@ -152,5 +152,6 @@ see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
 | noovcor       | A flag to disable dynamic overshoot correction (for testing) |
 | threads       | Simultaneous runs |
 | truncate      | Stop the simulation after this many runs |
+| seed      | Seed for the random number generator, if not given then time(0) is used |
 
 

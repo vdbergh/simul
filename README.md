@@ -24,7 +24,7 @@ http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
 
 ```
 $ ./simul -h
-simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] [--threads THREADS] [--truncate TRUNCATE]
+simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--batch BATCH] [--noovcor] [--threads THREADS] [--truncate TRUNCATE]
 
 $  ./simul --elo0 0 --elo1 2 --draw_ratio 0.56 --elo 2 --bias 90 --threads 4
 Design parameters
@@ -149,6 +149,7 @@ see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
 | beta     | Fail probability if H1 is true |
 | draw_ratio | Draw ratio between equal strength engines (taking into account the opening book) |
 | bias       | A proxy for `RMS bias` |
+| batch      | LLR calculation frequency |
 | noovcor       | A flag to disable dynamic overshoot correction (for testing) |
 | threads       | Simultaneous runs |
 | truncate      | Stop the simulation after this many runs |

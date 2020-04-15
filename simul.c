@@ -408,7 +408,7 @@ void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage
 */
 
 void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
-	      double pdf[],int overshoot,int *status,int *duration,int *invalid){
+	      double pdf[],int batch, int overshoot,int *status,int *duration,int *invalid){
   int results[N]={0,0,0,0,0};
   double LA=log(beta/(1-alpha));
   double LB=log((1-beta)/alpha);
@@ -432,6 +432,9 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
     (*duration)++;
     l=pick(prng,pdf);
     results[l]++;
+    if((*duration)%batch!=0){
+      continue;
+    }
     LLR_=LLR_logistic(score0,score1,results);
     /* 
        Dynamic overshoot correction using
@@ -476,6 +479,7 @@ typedef struct sim {
   double elo0;
   double elo1;
   double *pdf;
+  int    batch;
   int    overshoot;
   /* in/out data */
            uint64_t prng;
@@ -500,7 +504,7 @@ void *sim_function(void *args){
     int duration;
     int invalid;
     simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
-	     sim_->overshoot,&status,&duration,&invalid);
+	     sim_->batch,sim_->overshoot,&status,&duration,&invalid);
     duration*=2;
     pthread_mutex_lock(&mutex);
     sim_->total_duration+=duration;
@@ -517,11 +521,13 @@ void *sim_function(void *args){
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
 	 "[--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
-	 "[--threads THREADS] [--truncate TRUNCATE] [--seed SEED]\n");
+	 "[--threads THREADS] [--truncate TRUNCATE] [--batch BATCH] "
+         "[--seed SEED]\n");
 }
 
 int main(int argc, char **argv){
   double alpha=0.05,beta=0.05,elo0=0.0,elo1=5.0,elo=0.0,draw_ratio=0.61,bias=0.0;
+  int batch=1;
   double p,ci;
   double belo,belo0,belo1,draw_elo,advantage;
   double pdf[2*N];
@@ -612,6 +618,14 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
+    }else if(strcmp(argv[i],"--batch")==0){
+      if(i<argc-1){
+	batch=atoi(argv[i+1]);
+	i++;
+      }else{
+	usage();
+	return 0;
+      }
     }else if(strcmp(argv[i],"--seed")==0){
       if(i<argc-1){
 	seed=strtoull(argv[i+1],NULL,0);
@@ -627,7 +641,7 @@ int main(int argc, char **argv){
       return 0;
     }
   }
-  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1)){
+  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1)||batch<=0){
     usage();
     return 0;
   }
@@ -643,8 +657,9 @@ int main(int argc, char **argv){
 	 "elo1       = %8.4f\nelo        = %8.4f\ndraw_ratio = %8.4f\n"
 	 "bias       = %8.4f\n"
 	 "ovcor      = %3d\nthreads    = %3d\ntruncate   =   %d\n"
+	 "batch      = %3d\n"
 	 "seed       =   %" PRIu64 "\n\n",
-	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,seed);
+	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,batch,seed);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
   belo=elo_to_belo(elo,draw_elo,advantage);
   belo0=elo_to_belo(elo0,draw_elo,advantage);
@@ -662,6 +677,7 @@ int main(int argc, char **argv){
   sim_.elo0=elo0;
   sim_.elo1=elo1;
   sim_.pdf=pdf;
+  sim_.batch=batch;
   sim_.stop=0;
   sim_.count=0;
   sim_.pass=0;

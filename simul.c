@@ -520,7 +520,7 @@ void *sim_function(void *args){
 
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
-	 "[--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
+	 "[--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
 	 "[--threads THREADS] [--truncate TRUNCATE] [--batch BATCH] "
          "[--seed SEED]\n");
 }

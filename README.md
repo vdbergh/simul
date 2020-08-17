@@ -24,7 +24,7 @@ http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
 
 ```
 $ ./simul -h
-simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--batch BATCH] [--noovcor] [--threads THREADS] [--truncate TRUNCATE]
+simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--batch BATCH] [--noovcor] [--threads THREADS] [--truncate TRUNCATE]
 
 $  ./simul --elo0 0 --elo1 2 --draw_ratio 0.56 --elo 2 --bias 90 --threads 4
 Design parameters

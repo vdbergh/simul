@@ -16,6 +16,24 @@ pthread_t threads[MAX_THREADS];
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define NPROC_COMMAND "nproc"
+int nproc(void){
+  char *line=NULL;
+  size_t len=0;
+  ssize_t read;
+  int nproc_;
+  FILE *f=popen(NPROC_COMMAND,"r");
+  if(f==NULL){
+    return 1;
+  }
+  read=getline(&line,&len,f);
+  pclose(f);
+  nproc_=read>0?atoi(line):1;
+  free(line);
+  return nproc_;
+}
+
+
 typedef struct {
     int funcalls;
     int iterations;
@@ -531,7 +549,7 @@ int main(int argc, char **argv){
   double p,ci;
   double belo,belo0,belo1,draw_elo,advantage;
   double pdf[2*N];
-  int num_threads=1;
+  int num_threads=nproc();
   int overshoot=1;
   int i;
   sim_t sim_;

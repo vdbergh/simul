@@ -23,85 +23,43 @@ http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
 5. Sample usage:
 
 ```
-$ ./simul -h
-simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] [--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--batch BATCH] [--noovcor] [--threads THREADS] [--truncate TRUNCATE]
+$ ./simul --elo_model normalized --draw_ratio 0.95 --elo1 5 --elo 2.5
 
-$  ./simul --elo0 0 --elo1 2 --draw_ratio 0.56 --elo 2 --bias 90 --threads 4
 Design parameters
 =================
 alpha      =   0.0500
 beta       =   0.0500
 elo0       =   0.0000
-elo1       =   2.0000
-elo        =   2.0000
-draw_ratio =   0.5600
-bias       =  90.0000
+elo1       =   5.0000
+elo        =   2.5000
+draw_ratio =   0.9500
+bias       =   0.0000
 ovcor      =   1
 threads    =   4
 truncate   =   0
+batch      =   1
+elo_model  =   normalized
+seed       =   1609184261
 
 BayesElo
 ========
-belo0      =   0.0000
-belo1      =   3.2144
-belo       =   3.2144
-draw_elo   = 252.5476
-advantage  = 142.4833
-probs      =  [0.031425, 0.242521, 0.442462, 0.250299, 0.033293]
+draw_elo   = 636.4258
+advantage  =   0.0000
+probs      =  [0.000586, 0.045994, 0.903702, 0.049052, 0.000667]
 
-sims=192 pass=0.921875[0.863772,0.979978] length=63663.6 zeros=0.000000
-sims=382 pass=0.929319[0.889980,0.968658] length=62359.4 zeros=0.000000
-sims=590 pass=0.940678[0.911502,0.969854] length=61227.3 zeros=0.000000
-sims=780 pass=0.950000[0.926589,0.973411] length=62116.7 zeros=0.000000
-sims=973 pass=0.954779[0.934795,0.974763] length=61057.4 zeros=0.000000
-sims=1166 pass=0.955403[0.937268,0.973538] length=61900.8 zeros=0.000000
-sims=1352 pass=0.953402[0.936205,0.970599] length=62035.8 zeros=0.000000
-sims=1549 pass=0.952227[0.935970,0.968485] length=61941.6 zeros=0.000000
-sims=1782 pass=0.951740[0.936509,0.966970] length=61145.8 zeros=0.000000
-sims=1962 pass=0.951070[0.936460,0.965681] length=60964.2 zeros=0.000000
-sims=2167 pass=0.949239[0.935092,0.963385] length=61111.7 zeros=0.000000
-sims=2367 pass=0.950993[0.937681,0.964305] length=60992.7 zeros=0.000000
-sims=2572 pass=0.952177[0.939554,0.964800] length=60554.6 zeros=0.000000
-sims=2771 pass=0.950559[0.938205,0.962914] length=60848.6 zeros=0.000000
-...
+Elo         Logistic          Normalized            Bayes
+===         ========          ==========            =====
+Elo0         0.00000             0.00000          0.00000                   
+Elo1         1.11905             5.00000         11.47029                   
+Elo          0.55915             2.50000          5.73392                   
 
-$ ./simul --elo0 0 --elo1 2 --draw_ratio 0.56 --elo 0 --bias 90 --threads 4
-Design parameters
-=================
-alpha      =   0.0500
-beta       =   0.0500
-elo0       =   0.0000
-elo1       =   2.0000
-elo        =   0.0000
-draw_ratio =   0.5600
-bias       =  90.0000
-ovcor      =   1
-threads    =   4
-truncate   =   0
-
-BayesElo
-========
-belo0      =   0.0000
-belo1      =   3.2144
-belo       =   0.0000
-draw_elo   = 252.5476
-advantage  = 142.4833
-probs      =  [0.032347, 0.246400, 0.442505, 0.246400, 0.032347]
-
-sims=223 pass=0.062780[0.014050,0.111511] length=56532.5 zeros=0.000000
-sims=403 pass=0.059553[0.024187,0.094920] length=60041.7 zeros=0.000000
-sims=590 pass=0.059322[0.030146,0.088498] length=61325.5 zeros=0.000000
-sims=812 pass=0.057882[0.033297,0.082467] length=60446.0 zeros=0.000000
-sims=983 pass=0.055951[0.033960,0.077942] length=60883.8 zeros=0.000000
-sims=1190 pass=0.053782[0.034163,0.073400] length=61182.4 zeros=0.000000
-sims=1388 pass=0.054035[0.035829,0.072240] length=61321.8 zeros=0.000000
-sims=1579 pass=0.051298[0.034643,0.067953] length=61134.4 zeros=0.000000
-sims=1789 pass=0.053661[0.037678,0.069645] length=60998.3 zeros=0.000000
-sims=1989 pass=0.054299[0.039055,0.069542] length=60610.1 zeros=0.000000
-sims=2201 pass=0.054521[0.040002,0.069039] length=60354.0 zeros=0.000000
-sims=2414 pass=0.052610[0.038978,0.066241] length=60246.9 zeros=0.000000
-sims=2607 pass=0.052551[0.039440,0.065661] length=60097.2 zeros=0.000000
-sims=2818 pass=0.052874[0.040228,0.065521] length=60006.6 zeros=0.000000
+sims=3582 pass=0.498046[0.472983,0.523108] length=42403.3
+sims=7134 pass=0.498038[0.480278,0.515797] length=42285.6
+sims=10770 pass=0.498236[0.483782,0.512690] length=42140.3
+sims=14416 pass=0.494936[0.482444,0.507429] length=42002.2
+sims=18091 pass=0.495937[0.484785,0.507089] length=42015.6
+sims=21758 pass=0.495680[0.485511,0.505848] length=42048.9
+sims=25373 pass=0.498286[0.488869,0.507702] length=42118.0
 ...
 ```
 6. The `bias` parameter is a proxy for the `RMS bias` of the opening
@@ -129,30 +87,47 @@ probabilities derived from `belo, draw_elo, advantage`,
 corresponds to the given logistic Elo (`elo`). This requires
 numerically solving a suitable equation.
 
-8. The theoretical guarantees of the GSPRT are asymptotic.
-It does not work so well for very low outcome values.
-The proportion of zero outcomes for LD, LW+DD, DW is contained in the
-`zeros` output field.
-
-9. We perform `dynamic overshoot correction` using `Siegmund -
+8. We perform `dynamic overshoot correction` using `Siegmund -
 Sequential Analysis - Corollary 8.33`. For a rough introduction
 see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
 
+9. Normalized Elo is discussed in http://hardy.uhasselt.be/Fishtest/normalized_elo.pdf.
+However we now use a normalization factor
+```
+800/log(10)=347.43558552260146
+```
+which has the effect that for small elo differences and a perfectly balanced book the following
+formula holds approximately
+```
+normalized_elo=logistic_elo/sqrt(1-draw_ratio)
+```
+Hence when the draw ratio is zero, normalized Elo and logistic Elo coincide. For other
+draw ratios one has the following conversion table
+
+| draw ratio | 0.0 | 0.3 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 |
+|- |------|-----|-----|----|-|-|-|
+| Normalized Elo| 5.00 | 5.00 | 5.00| 5.00 | 5.00 |5.00 |5.00|
+| Logistic Elo| 5.00| 4.18 | 3.54 | 3.16 | 2.74 | 2.24 | 1.58|
+
+A `SPRT(0,5)`  with bounds expressed in normalized Elo (the above sample case) takes about `42k` games to complete
+(expected worst case) regardless of the book or the draw ratio. 
+
 ## Summary of parameters
 
-| Parameter | Explanation |
-| --------- | ----------- |
-| elo       | Actual Elo (difference) |
-| elo0      | H0 corresponds to Elo=Elo0 |
-| elo1      | H1 corresponds to Elo=Elo1 |
-| alpha     | Pass probability if H0 is true |
-| beta     | Fail probability if H1 is true |
-| draw_ratio | Draw ratio between equal strength engines (taking into account the opening book) |
-| bias       | A proxy for `RMS bias` |
-| batch      | LLR calculation frequency |
-| noovcor       | A flag to disable dynamic overshoot correction (for testing) |
-| threads       | Simultaneous runs |
-| truncate      | Stop the simulation after this many runs |
-| seed      | Seed for the random number generator, if not given then time(0) is used |
+| Parameter | Description | Default |
+| --------- | ----------- |---------|
+| --elo       | Actual Elo (difference) | 0 |
+| --elo0      | H0 corresponds to Elo=Elo0 | 0 |
+| --elo1      | H1 corresponds to Elo=Elo1 | 5 |
+| --alpha     | Pass probability if H0 is true | 0.05|
+| --beta     | Fail probability if H1 is true |0.05|
+| --draw_ratio | Draw ratio between equal strength engines | 0.61 |
+| --bias       | A proxy for `RMS bias` | 0 |
+| --batch      | LLR calculation frequency |1 game pair|
+| --noovcor       | A flag to disable dynamic overshoot correction |
+| --threads       | Simultaneous runs |# of CPUs |
+| --truncate      | Stop the simulation after this many runs |run forever|
+| --elo_model     | logistic or normalized | logistic |
+| --seed      | Seed for the random number generator| time(0) |
 
 

@@ -171,6 +171,10 @@ double L_(double x){
   return 1/(1+pow(10,-x/400.0));
 }
 
+double Linv(double s){
+  return -400*log10(1/s-1);
+}
+
 void muvar(double pdf_in[], double *mu, double *var){
   int i;
   double a,p;
@@ -299,6 +303,29 @@ double LLR(double pdf_in[], double s0, double s1){
   return sum;
 }
 
+double LLR_alt(double pdf_in[], double s0, double s1){
+  /*
+    This function computes the approximate generalized log likelihood ratio (divided by N)
+    for s=s1 versus s=s0 where pdf is an empirical distribution and
+    s is the expectation value of the true distribution.
+    pdf is a list of pairs (value,probability). See
+
+    http://hardy.uhasselt.be/Toga/computeLLR.pdf
+  */
+  /*
+    For efficiency this function is not used directly.
+   */
+  int i;
+  double p,v,r0=0.0,r1=0.0;
+  for(i=0;i<N;i++){
+    p=pdf_in[2*i+1];
+    v=pdf_in[2*i];
+    r0+=p*(v-s0)*(v-s0);
+    r1+=p*(v-s1)*(v-s1);
+  }
+  return 1/2.0*log(r0/r1);
+}
+
 void regularize(int results_in[], double results_out[]){
   /* 
      Replace zeros with a small value to avoid division by
@@ -341,6 +368,25 @@ double LLR_logistic(double s0, double s1, int results_in[]){
   return count*LLR(pdf_out,s0,s1);
 }
 
+double LLR_normalized(double s0,double s1, int results_in[]){
+  double pdf_out[2*N];
+  double count;
+  double mu,var,sigma_pg;
+  results_to_pdf(results_in, &count, pdf_out);
+  muvar(pdf_out,&mu,&var);
+  if(N==5){
+    sigma_pg=sqrt(2*var);
+  }else if(N==3){
+    sigma_pg=sqrt(var);
+  }else{
+    assert(0);
+  }
+  s0=s0*sigma_pg+0.5;
+  s1=s1*sigma_pg+0.5;
+  /* return count*LLR_alt(pdf_out,s0,s1); */
+  return (count/2.0)*log((var+(mu-s0)*(mu-s0))/(var+(mu-s1)*(mu-s1)));
+}
+
 /*
   We use the BayesElo model to generate realistic pentanomial
   frequencies. Therefore, our logistic input parameters have to be
@@ -381,7 +427,7 @@ void pent_calc(double belo, double draw_elo, double advantage, double pdf[]){
   for(i=0;i<3;i++){
     for(j=0;j<3;j++){
       k=i+j;
-      pdf[2*k]=k;
+      pdf[2*k]=k/4.0;
       pdf[2*k+1]+=ldw1[i]*ldw2[j];
     }
   }
@@ -393,13 +439,13 @@ typedef struct q {
   double advantage;
 } q_t;
 
-double g(double belo, void *args){
+double g(double belo, void *args){ /* logistic Elo */
   double pdf[2*N];
   q_t *qs=(q_t*)(args);
   double mu,var;
   pent_calc(belo,qs->draw_elo,qs->advantage,pdf);
   muvar(pdf,&mu,&var);
-  return 4*(qs->s)-mu;
+  return (qs->s)-mu;
 }
 
 double elo_to_belo(double elo, double draw_elo, double advantage){
@@ -408,6 +454,27 @@ double elo_to_belo(double elo, double draw_elo, double advantage){
   q_t qs={s,draw_elo,advantage};
   stats_t stats={0,0,0};
   double belo=brentq(g,-1000,1000,epsilon,epsilon,1000,&stats,&qs);
+  assert(stats.error_num==0);
+  return belo;
+}
+
+double h(double belo, void *args){ /* normalized Elo, assumes pentanomial */
+  double pdf[2*N];
+  q_t *qs=(q_t*)(args);
+  double mu,var;
+  pent_calc(belo,qs->draw_elo,qs->advantage,pdf);
+  muvar(pdf,&mu,&var);
+  return (qs->s)-(mu-1/2.0)/sqrt(2*var);
+}
+
+const double nelo_divided_by_nt=800/log(10); /* 347.43558552260146 */
+
+double nelo_to_belo(double nelo, double draw_elo, double advantage){
+  double epsilon=1e-9;
+  double s=nelo/nelo_divided_by_nt;
+  q_t qs={s,draw_elo,advantage};
+  stats_t stats={0,0,0};
+  double belo=brentq(h,-1000,1000,epsilon,epsilon,1000,&stats,&qs);
   assert(stats.error_num==0);
   return belo;
 }
@@ -425,12 +492,15 @@ void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage
   End of BayesElo conversion.
 */
 
-void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
+#define ELO_LOGISTIC 0
+#define ELO_NORMALIZED 1
+
+void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,int elo_model,
 	      double pdf[],int batch, int overshoot,int *status,int *duration,int *invalid){
   int results[N]={0,0,0,0,0};
   double LA=log(beta/(1-alpha));
   double LB=log((1-beta)/alpha);
-  int l;
+  double l;
   double LLR_;
   double min_LLR=0.0;
   double max_LLR=0.0;
@@ -438,9 +508,19 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
   double sq1=0.0;
   double o0=0.0;
   double o1=0.0;
-  double score0=L_(elo0);
-  double score1=L_(elo1);
+  double score0;
+  double score1;
   int i;
+
+  if(elo_model==ELO_LOGISTIC){
+    score0=L_(elo0);
+    score1=L_(elo1);
+  }else if(elo_model==ELO_NORMALIZED){
+    score0=elo0/nelo_divided_by_nt;
+    score1=elo1/nelo_divided_by_nt;
+  }else{
+    assert(0);
+  }
   
   *duration=0;
   *status=CONTINUE;
@@ -449,11 +529,17 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
   while(1){
     (*duration)++;
     l=pick(prng,pdf);
-    results[l]++;
+    results[(int) (4.0*l+0.001)]++; /* excess of caution */
     if((*duration)%batch!=0){
       continue;
     }
-    LLR_=LLR_logistic(score0,score1,results);
+    if(elo_model==ELO_LOGISTIC){
+      LLR_=LLR_logistic(score0,score1,results);
+    }else if(elo_model==ELO_NORMALIZED){
+      LLR_=LLR_normalized(score0,score1,results);
+    }else{
+      assert(0);
+    }
     /* 
        Dynamic overshoot correction using
        Siegmund - Sequential Analysis - Corollary 8.33.
@@ -499,6 +585,7 @@ typedef struct sim {
   double *pdf;
   int    batch;
   int    overshoot;
+  int    elo_model;
   /* in/out data */
            uint64_t prng;
   volatile int      stop;
@@ -521,7 +608,7 @@ void *sim_function(void *args){
     int status;
     int duration;
     int invalid;
-    simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
+    simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->elo_model,sim_->pdf, 
 	     sim_->batch,sim_->overshoot,&status,&duration,&invalid);
     duration*=2;
     pthread_mutex_lock(&mutex);
@@ -540,7 +627,31 @@ void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
 	 "[--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
 	 "[--threads THREADS] [--truncate TRUNCATE] [--batch BATCH] "
+	 "[--elo_model ELO_MODEL] "
          "[--seed SEED]\n");
+}
+
+void disp_elo_models(double pdf[], double pdf0[], double pdf1[],
+		     double belo, double belo0, double belo1){ /* Assumes pentanomial */
+  double mu,var,mu0,var0,mu1,var1,elo,elo0,elo1,nelo,nelo0,nelo1;
+  double eps=1e-6; /* to suppress spurious -0.0000 */
+  muvar(pdf,&mu,&var);
+  muvar(pdf0,&mu0,&var0);
+  muvar(pdf1,&mu1,&var1);
+  elo=Linv(mu)+eps;
+  elo0=Linv(mu0)+eps;
+  elo1=Linv(mu1)+eps;
+  nelo=(mu-0.5)/sqrt(2*var)*nelo_divided_by_nt+eps;
+  nelo0=(mu0-0.5)/sqrt(2*var0)*nelo_divided_by_nt+eps;
+  nelo1=(mu1-0.5)/sqrt(2*var1)*nelo_divided_by_nt+eps;
+  belo=belo+eps;
+  belo0=belo0+eps;
+  belo1=belo1+eps;
+  printf("Elo         Logistic          Normalized            Bayes\n");
+  printf("===         ========          ==========            =====\n");
+  printf("Elo0      %10.5f          %10.5f       %10.5f                   \n",elo0,nelo0,belo0);
+  printf("Elo1      %10.5f          %10.5f       %10.5f                   \n",elo1,nelo1,belo1);
+  printf("Elo       %10.5f          %10.5f       %10.5f                   \n",elo,nelo,belo);
 }
 
 int main(int argc, char **argv){
@@ -548,13 +659,13 @@ int main(int argc, char **argv){
   int batch=1;
   double p,ci;
   double belo,belo0,belo1,draw_elo,advantage;
-  double pdf[2*N];
+  double pdf[2*N],pdf0[2*N],pdf1[2*N];
   int num_threads=nproc();
   int overshoot=1;
+  int elo_model=ELO_LOGISTIC;
   int i;
   sim_t sim_;
   double av_duration;
-  double inv;
   int truncate=0;
   uint64_t seed=(uint64_t) time(0);
   for(i=1;i<=argc-1;i++){
@@ -644,6 +755,21 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
+    }else if(strcmp(argv[i],"--elo_model")==0){
+      if(i<argc-1){
+	if(strcmp(argv[i+1],"logistic")==0){
+	  elo_model=ELO_LOGISTIC;
+	}else if(strcmp(argv[i+1],"normalized")==0){
+	  elo_model=ELO_NORMALIZED;
+	}else{
+	  usage();
+	  return 0;
+	}
+	i+=1;
+      }else{
+	usage();
+	return 0;
+      }
     }else if(strcmp(argv[i],"--seed")==0){
       if(i<argc-1){
 	seed=strtoull(argv[i+1],NULL,0);
@@ -676,20 +802,33 @@ int main(int argc, char **argv){
 	 "bias       = %8.4f\n"
 	 "ovcor      = %3d\nthreads    = %3d\ntruncate   =   %d\n"
 	 "batch      = %3d\n"
+	 "elo_model  =   %s\n"
 	 "seed       =   %" PRIu64 "\n\n",
-	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,batch,seed);
+	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,batch,
+	 elo_model==ELO_LOGISTIC?"logistic":"normalized",seed);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
-  belo=elo_to_belo(elo,draw_elo,advantage);
-  belo0=elo_to_belo(elo0,draw_elo,advantage);
-  belo1=elo_to_belo(elo1,draw_elo,advantage);
+  if(elo_model==ELO_LOGISTIC){
+    belo=elo_to_belo(elo,draw_elo,advantage);  
+    belo0=elo_to_belo(elo0,draw_elo,advantage);
+    belo1=elo_to_belo(elo1,draw_elo,advantage);
+  }else if(elo_model==ELO_NORMALIZED){
+    belo=nelo_to_belo(elo,draw_elo,advantage);  
+    belo0=nelo_to_belo(elo0,draw_elo,advantage);
+    belo1=nelo_to_belo(elo1,draw_elo,advantage);
+  }else{
+    assert(0);
+  }
   pent_calc(belo,draw_elo,advantage,pdf);
+  pent_calc(belo0,draw_elo,advantage,pdf0);
+  pent_calc(belo1,draw_elo,advantage,pdf1);
   printf("BayesElo\n");
   printf("========\n");
-  printf("belo0      = %8.4f\nbelo1      = %8.4f\nbelo       = %8.4f\n"
-	 "draw_elo   = %8.4f\nadvantage  = %8.4f\n"
+  printf("draw_elo   = %8.4f\nadvantage  = %8.4f\n"
 	 "probs      =  [%f, %f, %f, %f, %f]\n\n",
-	 belo0,belo1,belo,draw_elo,advantage,
+	 draw_elo,advantage,
 	 pdf[1],pdf[3],pdf[5],pdf[7],pdf[9]);
+  disp_elo_models(pdf,pdf0,pdf1,belo,belo0,belo1);
+  printf("\n");
   sim_.alpha=alpha;
   sim_.beta=beta;
   sim_.elo0=elo0;
@@ -703,6 +842,7 @@ int main(int argc, char **argv){
   sim_.invalid=0;
   sim_.overshoot=overshoot;
   sim_.prng=seed;
+  sim_.elo_model=elo_model;
   
   for(i=0;i<num_threads;i++){
     pthread_create(&(threads[i]), NULL, sim_function, (void*) (&sim_));
@@ -713,11 +853,10 @@ int main(int argc, char **argv){
       continue;
     }
     p=sim_.pass/(sim_.count+0.0);
-    inv=sim_.invalid/(sim_.count+0.0);
     av_duration=sim_.total_duration/sim_.count;
     /* 3 sigma */
     ci=3*sqrt(p*(1-p))/sqrt(sim_.count);
-    printf("sims=%d pass=%f[%f,%f] length=%.1f zeros=%f\n",sim_.count,p,p-ci,p+ci,av_duration,inv);
+    printf("sims=%d pass=%f[%f,%f] length=%.1f\n",sim_.count,p,p-ci,p+ci,av_duration);
     fflush(stdout);
     if(truncate!=0 && sim_.count>=truncate){
       sim_.stop=1;

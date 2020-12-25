@@ -299,6 +299,26 @@ double LLR(double pdf_in[], double s0, double s1){
   return sum;
 }
 
+double LLR_alt(double pdf_in[], double s0, double s1){
+  /*
+    This function computes the approximate generalized log likelihood ratio (divided by N)
+    for s=s1 versus s=s0 where pdf is an empirical distribution and
+    s is the expectation value of the true distribution.
+    pdf is a list of pairs (value,probability). See
+
+    http://hardy.uhasselt.be/Toga/computeLLR.pdf
+  */
+  int i;
+  double p,v,r0=0.0,r1=0.0;
+  for(i=0;i<N;i++){
+    p=pdf_in[2*i+1];
+    v=pdf_in[2*i];
+    r0+=p*(v-s0)*(v-s0);
+    r1+=p*(v-s1)*(v-s1);
+  }
+  return 1/2.0*log(r0/r1);
+}
+
 void regularize(int results_in[], double results_out[]){
   /* 
      Replace zeros with a small value to avoid division by
@@ -339,6 +359,24 @@ double LLR_logistic(double s0, double s1, int results_in[]){
   double count;
   results_to_pdf(results_in, &count, pdf_out);
   return count*LLR(pdf_out,s0,s1);
+}
+
+double LLR_normalized(double s0,double s1, int results_in[]){
+  double pdf_out[2*N];
+  double count;
+  double mu,var,sigma_pg;
+  results_to_pdf(results_in, &count, pdf_out);
+  muvar(pdf_out,&mu,&var);
+  if(N==5){
+    sigma_pg=sqrt(2*var);
+  }else if(N==3){
+    sigma_pg=sqrt(var);
+  }else{
+    assert(0);
+  }
+  s0=s0*sigma_pg+0.5;
+  s1=s1*sigma_pg+0.5;
+  return count*LLR_alt(pdf_out,s0,s1);
 }
 
 /*
@@ -425,7 +463,10 @@ void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage
   End of BayesElo conversion.
 */
 
-void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
+#define ELO_LOGISTIC 0
+#define ELO_NORMALIZED 1
+
+void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,int elo_model,
 	      double pdf[],int batch, int overshoot,int *status,int *duration,int *invalid){
   int results[N]={0,0,0,0,0};
   double LA=log(beta/(1-alpha));
@@ -438,9 +479,19 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
   double sq1=0.0;
   double o0=0.0;
   double o1=0.0;
-  double score0=L_(elo0);
-  double score1=L_(elo1);
+  double score0;
+  double score1;
   int i;
+
+  if(elo_model==ELO_LOGISTIC){
+    score0=L_(elo0);
+    score1=L_(elo1);
+  }else if(elo_model==ELO_NORMALIZED){
+    score0=L_(2*elo0)-0.5;
+    score1=L_(2*elo1)-0.5;
+  }else{
+    assert(0);
+  }
   
   *duration=0;
   *status=CONTINUE;
@@ -453,7 +504,13 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,
     if((*duration)%batch!=0){
       continue;
     }
-    LLR_=LLR_logistic(score0,score1,results);
+    if(elo_model==ELO_LOGISTIC){
+      LLR_=LLR_logistic(score0,score1,results);
+    }else if(elo_model==ELO_NORMALIZED){
+      LLR_=LLR_normalized(score0,score1,results);
+    }else{
+      assert(0);
+    }
     /* 
        Dynamic overshoot correction using
        Siegmund - Sequential Analysis - Corollary 8.33.
@@ -521,7 +578,7 @@ void *sim_function(void *args){
     int status;
     int duration;
     int invalid;
-    simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->pdf,
+    simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,ELO_NORMALIZED,sim_->pdf, /* CHANGE BACK!!!!!!!!!!!! */
 	     sim_->batch,sim_->overshoot,&status,&duration,&invalid);
     duration*=2;
     pthread_mutex_lock(&mutex);

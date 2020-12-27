@@ -419,7 +419,7 @@ void pent_calc(double belo, double draw_elo, double advantage, double pdf[]){
   for(i=0;i<3;i++){
     for(j=0;j<3;j++){
       k=i+j;
-      pdf[2*k]=k;
+      pdf[2*k]=k/4.0;
       pdf[2*k+1]+=ldw1[i]*ldw2[j];
     }
   }
@@ -431,13 +431,13 @@ typedef struct q {
   double advantage;
 } q_t;
 
-double g(double belo, void *args){
+double g(double belo, void *args){ /* logistic Elo */
   double pdf[2*N];
   q_t *qs=(q_t*)(args);
   double mu,var;
   pent_calc(belo,qs->draw_elo,qs->advantage,pdf);
   muvar(pdf,&mu,&var);
-  return 4*(qs->s)-mu;
+  return (qs->s)-mu;
 }
 
 double elo_to_belo(double elo, double draw_elo, double advantage){
@@ -449,6 +449,27 @@ double elo_to_belo(double elo, double draw_elo, double advantage){
   assert(stats.error_num==0);
   return belo;
 }
+
+double h(double belo, void *args){ /* normalized Elo */
+  double pdf[2*N];
+  q_t *qs=(q_t*)(args);
+  double mu,var;
+  pent_calc(belo,qs->draw_elo,qs->advantage,pdf);
+  muvar(pdf,&mu,&var);
+  return (qs->s)-(mu-1/2.0)/sqrt(2*var);
+}
+
+double nelo_to_belo(double nelo, double draw_elo, double advantage){
+  double epsilon=1e-9;
+  double s=L_(2*nelo)-1/2.0;
+  q_t qs={s,draw_elo,advantage};
+  stats_t stats={0,0,0};
+  double belo=brentq(h,-1000,1000,epsilon,epsilon,1000,&stats,&qs);
+  assert(stats.error_num==0);
+  return belo;
+}
+
+
 
 void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage){
   double P[3];
@@ -471,7 +492,7 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
   int results[N]={0,0,0,0,0};
   double LA=log(beta/(1-alpha));
   double LB=log((1-beta)/alpha);
-  int l;
+  double l;
   double LLR_;
   double min_LLR=0.0;
   double max_LLR=0.0;
@@ -500,7 +521,7 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
   while(1){
     (*duration)++;
     l=pick(prng,pdf);
-    results[l]++;
+    results[(int) (4.0*l+0.001)]++;
     if((*duration)%batch!=0){
       continue;
     }
@@ -736,9 +757,9 @@ int main(int argc, char **argv){
 	 "seed       =   %" PRIu64 "\n\n",
 	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,batch,seed);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
-  belo=elo_to_belo(elo,draw_elo,advantage);
-  belo0=elo_to_belo(elo0,draw_elo,advantage);
-  belo1=elo_to_belo(elo1,draw_elo,advantage);
+  belo=nelo_to_belo(elo,draw_elo,advantage);  /* CHANGE !!!!!!!!!!! */
+  belo0=nelo_to_belo(elo0,draw_elo,advantage); /* CHANGE !!!!!!!!!!! */
+  belo1=nelo_to_belo(elo1,draw_elo,advantage); /* CHANGE !!!!!!!!!!! */
   pent_calc(belo,draw_elo,advantage,pdf);
   printf("BayesElo\n");
   printf("========\n");

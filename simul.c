@@ -454,7 +454,7 @@ double elo_to_belo(double elo, double draw_elo, double advantage){
   return belo;
 }
 
-double h(double belo, void *args){ /* normalized Elo */
+double h(double belo, void *args){ /* normalized Elo, assumes pentanomial */
   double pdf[2*N];
   q_t *qs=(q_t*)(args);
   double mu,var;
@@ -463,17 +463,17 @@ double h(double belo, void *args){ /* normalized Elo */
   return (qs->s)-(mu-1/2.0)/sqrt(2*var);
 }
 
+const double nelo_divided_by_nt=800/log(10); /* 347.43558552260146 */
+
 double nelo_to_belo(double nelo, double draw_elo, double advantage){
   double epsilon=1e-9;
-  double s=L_(2*nelo)-1/2.0;
+  double s=nelo/nelo_divided_by_nt;
   q_t qs={s,draw_elo,advantage};
   stats_t stats={0,0,0};
   double belo=brentq(h,-1000,1000,epsilon,epsilon,1000,&stats,&qs);
   assert(stats.error_num==0);
   return belo;
 }
-
-
 
 void be_data(double draw_ratio, double bias, double *draw_elo, double *advantage){
   double P[3];
@@ -512,8 +512,8 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
     score0=L_(elo0);
     score1=L_(elo1);
   }else if(elo_model==ELO_NORMALIZED){
-    score0=L_(2*elo0)-0.5;
-    score1=L_(2*elo1)-0.5;
+    score0=elo0/nelo_divided_by_nt;
+    score1=elo1/nelo_divided_by_nt;
   }else{
     assert(0);
   }

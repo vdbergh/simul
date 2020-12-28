@@ -639,7 +639,6 @@ int main(int argc, char **argv){
   int i;
   sim_t sim_;
   double av_duration;
-  double inv;
   int truncate=0;
   uint64_t seed=(uint64_t) time(0);
   for(i=1;i<=argc-1;i++){
@@ -824,11 +823,10 @@ int main(int argc, char **argv){
       continue;
     }
     p=sim_.pass/(sim_.count+0.0);
-    inv=sim_.invalid/(sim_.count+0.0);
     av_duration=sim_.total_duration/sim_.count;
     /* 3 sigma */
     ci=3*sqrt(p*(1-p))/sqrt(sim_.count);
-    printf("sims=%d pass=%f[%f,%f] length=%.1f zeros=%f\n",sim_.count,p,p-ci,p+ci,av_duration,inv);
+    printf("sims=%d pass=%f[%f,%f] length=%.1f\n",sim_.count,p,p-ci,p+ci,av_duration);
     fflush(stdout);
     if(truncate!=0 && sim_.count>=truncate){
       sim_.stop=1;

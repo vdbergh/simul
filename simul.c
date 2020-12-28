@@ -171,6 +171,10 @@ double L_(double x){
   return 1/(1+pow(10,-x/400.0));
 }
 
+double Linv(double s){
+  return -400*log10(1/s-1);
+}
+
 void muvar(double pdf_in[], double *mu, double *var){
   int i;
   double a,p;
@@ -627,12 +631,35 @@ void usage(){
          "[--seed SEED]\n");
 }
 
+void disp_elo_models(double pdf[], double pdf0[], double pdf1[],
+		     double belo, double belo0, double belo1){ /* Assumes pentanomial */
+  double mu,var,mu0,var0,mu1,var1,elo,elo0,elo1,nelo,nelo0,nelo1;
+  double eps=1e-6; /* to suppress spurious -0.0000 */
+  muvar(pdf,&mu,&var);
+  muvar(pdf0,&mu0,&var0);
+  muvar(pdf1,&mu1,&var1);
+  elo=Linv(mu)+eps;
+  elo0=Linv(mu0)+eps;
+  elo1=Linv(mu1)+eps;
+  nelo=(mu-0.5)/sqrt(2*var)*nelo_divided_by_nt+eps;
+  nelo0=(mu0-0.5)/sqrt(2*var0)*nelo_divided_by_nt+eps;
+  nelo1=(mu1-0.5)/sqrt(2*var1)*nelo_divided_by_nt+eps;
+  belo=belo+eps;
+  belo0=belo0+eps;
+  belo1=belo1+eps;
+  printf("Elo         Logistic          Normalized            Bayes\n");
+  printf("===         ========          ==========            =====\n");
+  printf("Elo0      %10.5f          %10.5f       %10.5f                   \n",elo0,nelo0,belo0);
+  printf("Elo1      %10.5f          %10.5f       %10.5f                   \n",elo1,nelo1,belo1);
+  printf("Elo       %10.5f          %10.5f       %10.5f                   \n",elo,nelo,belo);
+}
+
 int main(int argc, char **argv){
   double alpha=0.05,beta=0.05,elo0=0.0,elo1=5.0,elo=0.0,draw_ratio=0.61,bias=0.0;
   int batch=1;
   double p,ci;
   double belo,belo0,belo1,draw_elo,advantage;
-  double pdf[2*N];
+  double pdf[2*N],pdf0[2*N],pdf1[2*N];
   int num_threads=nproc();
   int overshoot=1;
   int elo_model=ELO_LOGISTIC;
@@ -792,13 +819,16 @@ int main(int argc, char **argv){
     assert(0);
   }
   pent_calc(belo,draw_elo,advantage,pdf);
+  pent_calc(belo0,draw_elo,advantage,pdf0);
+  pent_calc(belo1,draw_elo,advantage,pdf1);
   printf("BayesElo\n");
   printf("========\n");
-  printf("belo0      = %8.4f\nbelo1      = %8.4f\nbelo       = %8.4f\n"
-	 "draw_elo   = %8.4f\nadvantage  = %8.4f\n"
+  printf("draw_elo   = %8.4f\nadvantage  = %8.4f\n"
 	 "probs      =  [%f, %f, %f, %f, %f]\n\n",
-	 belo0,belo1,belo,draw_elo,advantage,
+	 draw_elo,advantage,
 	 pdf[1],pdf[3],pdf[5],pdf[7],pdf[9]);
+  disp_elo_models(pdf,pdf0,pdf1,belo,belo0,belo1);
+  printf("\n");
   sim_.alpha=alpha;
   sim_.beta=beta;
   sim_.elo0=elo0;

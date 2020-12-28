@@ -308,6 +308,9 @@ double LLR_alt(double pdf_in[], double s0, double s1){
 
     http://hardy.uhasselt.be/Toga/computeLLR.pdf
   */
+  /*
+    For efficiency this function is not used directly.
+   */
   int i;
   double p,v,r0=0.0,r1=0.0;
   for(i=0;i<N;i++){
@@ -376,7 +379,8 @@ double LLR_normalized(double s0,double s1, int results_in[]){
   }
   s0=s0*sigma_pg+0.5;
   s1=s1*sigma_pg+0.5;
-  return count*LLR_alt(pdf_out,s0,s1);
+  /* return count*LLR_alt(pdf_out,s0,s1); */
+  return (count/2.0)*log((var+(mu-s0)*(mu-s0))/(var+(mu-s1)*(mu-s1)));
 }
 
 /*

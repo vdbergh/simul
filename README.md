@@ -39,6 +39,8 @@ bias       =  90.0000
 ovcor      =   1
 threads    =   4
 truncate   =   0
+elo_model  =   logistic
+seed       =   1609147202
 
 BayesElo
 ========
@@ -78,6 +80,8 @@ bias       =  90.0000
 ovcor      =   1
 threads    =   4
 truncate   =   0
+elo_model  =   logistic
+seed       =   1609147202
 
 BayesElo
 ========
@@ -140,19 +144,20 @@ see http://hardy.uhasselt.be/Fishtest/dynamic_overshoot_correction.pdf.
 
 ## Summary of parameters
 
-| Parameter | Explanation |
-| --------- | ----------- |
-| elo       | Actual Elo (difference) |
-| elo0      | H0 corresponds to Elo=Elo0 |
-| elo1      | H1 corresponds to Elo=Elo1 |
-| alpha     | Pass probability if H0 is true |
-| beta     | Fail probability if H1 is true |
-| draw_ratio | Draw ratio between equal strength engines (taking into account the opening book) |
-| bias       | A proxy for `RMS bias` |
-| batch      | LLR calculation frequency |
-| noovcor       | A flag to disable dynamic overshoot correction (for testing) |
-| threads       | Simultaneous runs |
-| truncate      | Stop the simulation after this many runs |
-| seed      | Seed for the random number generator, if not given then time(0) is used |
+| Parameter | Description | Default |
+| --------- | ----------- |---------|
+| --elo       | Actual Elo (difference) |
+| --elo0      | H0 corresponds to Elo=Elo0 |
+| --elo1      | H1 corresponds to Elo=Elo1 |
+| --alpha     | Pass probability if H0 is true | 0.05|
+| --beta     | Fail probability if H1 is true |0.05|
+| --draw_ratio | Draw ratio between equal strength engines |
+| --bias       | A proxy for `RMS bias` |
+| --batch      | LLR calculation frequency |1 game pair|
+| --noovcor       | A flag to disable dynamic overshoot correction |
+| --threads       | Simultaneous runs |# of CPUs |
+| --truncate      | Stop the simulation after this many runs |run forever|
+| --elo_model     | logistic or normalized | logistic |
+| --seed      | Seed for the random number generator| time(0) |
 
 

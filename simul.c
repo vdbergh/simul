@@ -525,7 +525,7 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
   while(1){
     (*duration)++;
     l=pick(prng,pdf);
-    results[(int) (4.0*l+0.001)]++;
+    results[(int) (4.0*l+0.001)]++; /* excess of caution */
     if((*duration)%batch!=0){
       continue;
     }
@@ -581,6 +581,7 @@ typedef struct sim {
   double *pdf;
   int    batch;
   int    overshoot;
+  int    elo_model;
   /* in/out data */
            uint64_t prng;
   volatile int      stop;
@@ -603,7 +604,7 @@ void *sim_function(void *args){
     int status;
     int duration;
     int invalid;
-    simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,ELO_NORMALIZED,sim_->pdf, /* CHANGE BACK!!!!!!!!!!!! */
+    simulate(&prng,sim_->alpha,sim_->beta,sim_->elo0,sim_->elo1,sim_->elo_model,sim_->pdf, 
 	     sim_->batch,sim_->overshoot,&status,&duration,&invalid);
     duration*=2;
     pthread_mutex_lock(&mutex);
@@ -622,6 +623,7 @@ void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
 	 "[--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
 	 "[--threads THREADS] [--truncate TRUNCATE] [--batch BATCH] "
+	 "[--elo_model ELO_MODEL] "
          "[--seed SEED]\n");
 }
 
@@ -633,6 +635,7 @@ int main(int argc, char **argv){
   double pdf[2*N];
   int num_threads=nproc();
   int overshoot=1;
+  int elo_model=ELO_LOGISTIC;
   int i;
   sim_t sim_;
   double av_duration;
@@ -726,6 +729,21 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
+    }else if(strcmp(argv[i],"--elo_model")==0){
+      if(i<argc-1){
+	if(strcmp(argv[i+1],"logistic")==0){
+	  elo_model=ELO_LOGISTIC;
+	}else if(strcmp(argv[i+1],"normalized")==0){
+	  elo_model=ELO_NORMALIZED;
+	}else{
+	  usage();
+	  return 0;
+	}
+	i+=1;
+      }else{
+	usage();
+	return 0;
+      }
     }else if(strcmp(argv[i],"--seed")==0){
       if(i<argc-1){
 	seed=strtoull(argv[i+1],NULL,0);
@@ -758,12 +776,22 @@ int main(int argc, char **argv){
 	 "bias       = %8.4f\n"
 	 "ovcor      = %3d\nthreads    = %3d\ntruncate   =   %d\n"
 	 "batch      = %3d\n"
+	 "elo_model  =   %s\n"
 	 "seed       =   %" PRIu64 "\n\n",
-	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,batch,seed);
+	 alpha,beta,elo0,elo1,elo,draw_ratio,bias,overshoot,num_threads,truncate,batch,
+	 elo_model==ELO_LOGISTIC?"logistic":"normalized",seed);
   be_data(draw_ratio,bias,&draw_elo,&advantage);
-  belo=nelo_to_belo(elo,draw_elo,advantage);  /* CHANGE !!!!!!!!!!! */
-  belo0=nelo_to_belo(elo0,draw_elo,advantage); /* CHANGE !!!!!!!!!!! */
-  belo1=nelo_to_belo(elo1,draw_elo,advantage); /* CHANGE !!!!!!!!!!! */
+  if(elo_model==ELO_LOGISTIC){
+    belo=elo_to_belo(elo,draw_elo,advantage);  
+    belo0=elo_to_belo(elo0,draw_elo,advantage);
+    belo1=elo_to_belo(elo1,draw_elo,advantage);
+  }else if(elo_model==ELO_NORMALIZED){
+    belo=nelo_to_belo(elo,draw_elo,advantage);  
+    belo0=nelo_to_belo(elo0,draw_elo,advantage);
+    belo1=nelo_to_belo(elo1,draw_elo,advantage);
+  }else{
+    assert(0);
+  }
   pent_calc(belo,draw_elo,advantage,pdf);
   printf("BayesElo\n");
   printf("========\n");
@@ -785,6 +813,7 @@ int main(int argc, char **argv){
   sim_.invalid=0;
   sim_.overshoot=overshoot;
   sim_.prng=seed;
+  sim_.elo_model=elo_model;
   
   for(i=0;i<num_threads;i++){
     pthread_create(&(threads[i]), NULL, sim_function, (void*) (&sim_));

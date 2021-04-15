@@ -310,7 +310,7 @@ double LLR_alt(double pdf_in[], double s0, double s1){
     s is the expectation value of the true distribution.
     pdf is a list of pairs (value,probability). See
 
-    http://hardy.uhasselt.be/Toga/computeLLR.pdf
+    http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
   */
   /*
     For efficiency this function is not used directly.
@@ -368,23 +368,27 @@ double LLR_logistic(double s0, double s1, int results_in[]){
   return count*LLR(pdf_out,s0,s1);
 }
 
-double LLR_normalized(double s0,double s1, int results_in[]){
+double LLR_normalized(double tn0, double tn1, int results_in[]){
+  /*
+    See Section 4 in
+    http://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
+  */
   double pdf_out[2*N];
   double count;
-  double mu,var,sigma_pg;
+  double mu,var,sigma_pg,games,tn;
   results_to_pdf(results_in, &count, pdf_out);
   muvar(pdf_out,&mu,&var);
   if(N==5){
     sigma_pg=sqrt(2*var);
+    games=2*count;
   }else if(N==3){
     sigma_pg=sqrt(var);
+    games=count;
   }else{
     assert(0);
   }
-  s0=s0*sigma_pg+0.5;
-  s1=s1*sigma_pg+0.5;
-  /* return count*LLR_alt(pdf_out,s0,s1); */
-  return (count/2.0)*log((var+(mu-s0)*(mu-s0))/(var+(mu-s1)*(mu-s1)));
+  tn=(mu-0.5)/sigma_pg;
+  return (games/2.0)*log((1+(tn-tn0)*(tn-tn0))/(1+(tn-tn1)*(tn-tn1)));
 }
 
 /*

@@ -167,12 +167,29 @@ brentq(callback_type f, double xa, double xb, double xtol, double rtol,
 #define H1 1
 #define CONTINUE 2
 
+/*
+    Probality distributions (generally having a name starting with
+    "pdf") are represented by an array[2*N] consisting of pairs
+    (ai,pi), i=1,...,N.  It is usually assumed that the ai are strictly
+    ascending and p1>0, pN>0.
+*/
+
 double L_(double x){
   return 1/(1+pow(10,-x/400.0));
 }
 
 double Linv(double s){
   return -400*log10(1/s-1);
+}
+
+void disp(double pdf[]){
+  int i;
+  printf("[");
+  for(i=0;i<N-1;i++){
+    printf("(%f,%f), ",pdf[2*i],pdf[2*i+1]);
+  }
+  i=N-1;
+  printf("(%f,%f)]\n",pdf[2*i],pdf[2*i+1]);
 }
 
 void muvar(double pdf_in[], double *mu, double *var){
@@ -195,35 +212,50 @@ void muvar(double pdf_in[], double *mu, double *var){
   *var=sum2-(*mu)*(*mu);
 }
 
-typedef struct p {
-  double *pdf_in;
-  double s;
-} p_t;
-
 double f(double x, void *args){
   int i;
   double a,p;
   double sum=0.0;
-  p_t *ps=(p_t*)(args);
-  double s=ps->s;
-  double *pdf_in=ps->pdf_in;
+  double *pdf_in=(double*)(args);
   for(i=0;i<N;i++){
     a=pdf_in[2*i];
     p=pdf_in[2*i+1];
-    sum+=p*(a-s)/(1+x*(a-s));
+    sum+=p*a/(1+x*a);
   }
   return sum;
 }
 
-void MLE(double pdf_in[], double s, double pdf_out[]){
+double secular(double pdf_in[]){
+  stats_t stats={0,0,0};
+  int i;
+  double t,v,w,l,u,epsilon,xtol,rtol,x;
+  v=pdf_in[0];
+  w=pdf_in[0];
+  for(i=2;i<2*N;i+=2){
+    t=pdf_in[i];
+    if(t<v){
+      v=t;
+    }
+    if(t>w){
+      w=t;
+    }
+  }
+  assert(v*w<0);
+  l=-1/w;
+  u=-1/v;
+  epsilon=1e-9;
+  xtol=2e-12; // scipy defaults
+  rtol=8.881784197001252e-16;
+  x=brentq(f,l+epsilon,u-epsilon,xtol,rtol,1000,&stats,(void*)pdf_in);
+  assert(stats.error_num==0);
+  return x;
+}
+
+void MLE_expected(double pdf_in[], double s, double pdf_out[]){
   /*
     This function computes the maximum likelood estimate for a
     discrete distribution with expectation value s, given an observed
     (i.e. empirical) distribution pdf_in.
-    
-    pdf_in is an array[2*N] consisting of pairs (ai,pi), i=1,...,N.  It
-    is assumed that that the ai are strictly ascending, a1<s<aN and
-    p1>0, pN>0.
     
     The theory behind this function can be found in the online 
     document
@@ -232,19 +264,16 @@ void MLE(double pdf_in[], double s, double pdf_out[]){
     
     (see Proposition 1.1).
   */
-  double epsilon=1e-9;
-  double v,w,l,u,x,p,a,mu,var;
-  stats_t stats={0,0,0};
+  double x,p,a,mu,var;
   int i;
-  p_t ps;
-  v=pdf_in[0];
-  w=pdf_in[2*(N-1)];
-  l=-1/(w-s);
-  u=1/(s-v);
-  ps.s=s;
-  ps.pdf_in=pdf_in;
-  x=brentq(f,l+epsilon,u-epsilon,epsilon,epsilon,1000,&stats,&ps);
-  assert(stats.error_num==0);
+  double pdf1[2*N];
+  for(i=0;i<N;i++){
+    a=pdf_in[2*i];
+    p=pdf_in[2*i+1];
+    pdf1[2*i]=a-s;
+    pdf1[2*i+1]=p;
+  }
+  x=secular(pdf1);
   for(i=0;i<N;i++){
     a=pdf_in[2*i];
     p=pdf_in[2*i+1];
@@ -253,6 +282,56 @@ void MLE(double pdf_in[], double s, double pdf_out[]){
   }
   muvar(pdf_out,&mu,&var); /* for validation */
   assert(fabs(s-mu)<1e-6);
+}
+
+void uniform(double pdf_in[], double pdf_out[]){
+  double Ninv=1/((double) N);
+  int i;
+  double a;
+  for(i=0;i<N;i++){
+    a=pdf_in[2*i];
+    pdf_out[2*i]=a;
+    pdf_out[2*i+1]=Ninv;
+  }
+}
+
+void MLE_t_value(double pdf_in[], double ref, double s, double pdf_out[]){
+  /*
+    See https://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
+    Section 4.1
+  */
+  double pdf_[2*N];
+  double mu,var,a,p,x,m,d;
+  int i,j;
+  uniform(pdf_in,pdf_out);
+  for(i=0;i<10;i++){
+    memcpy(pdf_,pdf_out,2*N*sizeof(double));
+    muvar(pdf_out,&mu,&var);
+    double sigma=sqrt(var);
+    double pdf1[2*N];
+    for(j=0;j<N;j++){
+      a=pdf_in[2*j];
+      p=pdf_in[2*j+1];
+      pdf1[2*j]=a-ref-s*sigma*(1+pow((mu-a)/sigma,2))/2;
+      pdf1[2*j+1]=p;
+    }
+    x=secular(pdf1);
+    for(j=0;j<N;j++){
+      pdf_out[2*j+1]=pdf_in[2*j+1]/(1+x*pdf1[2*j]);
+    }
+    m=0;
+    for(j=0;j<N;j++){
+      d=fabs(pdf_[2*j+1]-pdf_out[2*j+1]);
+      if(d>m){
+	m=d;
+      }
+    }
+    if(m<1e-9){
+      break;
+    }
+  }
+  muvar(pdf_out,&mu,&var);
+  assert(fabs(s-(mu-ref)/sqrt(var))<1e-5);
 }
 
 double myrand(uint64_t *prng){
@@ -287,13 +366,29 @@ double pick(uint64_t *prng, double pdf[]){
   return pdf[2*(N-1)];
 }
 
-double LLR(double pdf_in[], double s0, double s1){
+double LLR_expected(double pdf_in[], double s0, double s1){
   double pdf0[2*N], pdf1[2*N];
   double p,p0,p1;
   double sum=0.0;
   int i;
-  MLE(pdf_in,s0,pdf0);
-  MLE(pdf_in,s1,pdf1);
+  MLE_expected(pdf_in,s0,pdf0);
+  MLE_expected(pdf_in,s1,pdf1);
+  for(i=0;i<N;i++){
+    p=pdf_in[2*i+1];
+    p0=pdf0[2*i+1];
+    p1=pdf1[2*i+1];
+    sum+=p*log(p1/p0);
+  }
+  return sum;
+}
+
+double LLR_t_value(double pdf_in[], double ref, double s0, double s1){
+  double pdf0[2*N], pdf1[2*N];
+  double p,p0,p1;
+  double sum=0.0;
+  int i;
+  MLE_t_value(pdf_in,ref,s0,pdf0);
+  MLE_t_value(pdf_in,ref,s1,pdf1);
   for(i=0;i<N;i++){
     p=pdf_in[2*i+1];
     p0=pdf0[2*i+1];
@@ -308,13 +403,9 @@ double LLR_alt(double pdf_in[], double s0, double s1){
     This function computes the approximate generalized log likelihood ratio (divided by N)
     for s=s1 versus s=s0 where pdf is an empirical distribution and
     s is the expectation value of the true distribution.
-    pdf is a list of pairs (value,probability). See
 
     http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
   */
-  /*
-    For efficiency this function is not used directly.
-   */
   int i;
   double p,v,r0=0.0,r1=0.0;
   for(i=0;i<N;i++){
@@ -329,9 +420,9 @@ double LLR_alt(double pdf_in[], double s0, double s1){
 void regularize(int results_in[], double results_out[]){
   /* 
      Replace zeros with a small value to avoid division by
-     zero later on.
+     zero issues.
   */
-  double epsilon=1e-3;
+  double epsilon=1e-4;
   int i;
   for(i=0; i<N; i++){
     if(results_in[i]==0){
@@ -359,23 +450,46 @@ void results_to_pdf(int results_in[], double *count, double pdf_out[]){
 double LLR_logistic(double s0, double s1, int results_in[]){
   /*
     This function computes the generalized log-likelihood ratio for
-    "results_in" which should be an array if length 5 containing the
+    "results_in" which should be an array of length 5 containing the
     frequencies of the game pairs LL,LD+DL,LW+DD+WL,DW+WD,WW.
   */
   double pdf_out[2*N];
   double count;
   results_to_pdf(results_in, &count, pdf_out);
-  return count*LLR(pdf_out,s0,s1);
+  return count*LLR_expected(pdf_out,s0,s1);
 }
 
-double LLR_normalized(double tn0, double tn1, int results_in[]){
+double LLR_normalized(double nt0, double nt1, int results_in[]){
   /*
-    See Section 4 in
+    Like LLR_logistic but using normalized t-values.
+    See Section 4.1 in
     http://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
   */
   double pdf_out[2*N];
   double count;
-  double mu,var,sigma_pg,games,tn;
+  double t0,t1;
+  double sqrt2=sqrt(2);
+  if(N==3){
+    t0=nt0;
+    t1=nt1;
+  }else if(N==5){
+    t0=nt0*sqrt2;
+    t1=nt1*sqrt2;
+  }else{
+    assert(0);
+  }
+  results_to_pdf(results_in, &count, pdf_out);
+  return count*LLR_t_value(pdf_out,0.5,t0,t1);
+}
+
+double LLR_normalized_alt(double nt0, double nt1, int results_in[]){
+  /*
+    See Section 4.2 in
+    http://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
+  */
+  double pdf_out[2*N];
+  double count;
+  double mu,var,sigma_pg,games,nt;
   results_to_pdf(results_in, &count, pdf_out);
   muvar(pdf_out,&mu,&var);
   if(N==5){
@@ -387,8 +501,8 @@ double LLR_normalized(double tn0, double tn1, int results_in[]){
   }else{
     assert(0);
   }
-  tn=(mu-0.5)/sigma_pg;
-  return (games/2.0)*log((1+(tn-tn0)*(tn-tn0))/(1+(tn-tn1)*(tn-tn1)));
+  nt=(mu-0.5)/sigma_pg;
+  return (games/2.0)*log((1+(nt-nt0)*(nt-nt0))/(1+(nt-nt1)*(nt-nt1)));
 }
 
 /*
@@ -400,8 +514,8 @@ double LLR_normalized(double tn0, double tn1, int results_in[]){
 
   - Determine the Elo of the BayesElo model in such a way that the score
   as calculated using pentanomial probabilities derived from this Elo,
-  corresponds to the given logistic Elo. This requires numerically solving
-  a suitable equation.
+  corresponds to the given logistic/normalized Elo. This requires numerically
+  solving a suitable equation.
 */
 
 void proba_to_bayeselo(double P[],double *belo,double *drawelo){
@@ -471,7 +585,8 @@ double h(double belo, void *args){ /* normalized Elo, assumes pentanomial */
   return (qs->s)-(mu-1/2.0)/sqrt(2*var);
 }
 
-const double nelo_divided_by_nt=800/log(10); /* 347.43558552260146 */
+const double nelo_divided_by_nt=347.43558552260146; // 800/log(10) 
+
 
 double nelo_to_belo(double nelo, double draw_elo, double advantage){
   double epsilon=1e-9;
@@ -870,6 +985,7 @@ int main(int argc, char **argv){
       break;
     }
   }
+  return 0;
 }
 
 

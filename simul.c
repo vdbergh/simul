@@ -8,6 +8,7 @@
 #include <time.h>
 #include <string.h>
 #include <inttypes.h>
+#include <float.h>
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_THREADS 128
@@ -228,7 +229,7 @@ double f(double x, void *args){
 double secular(double pdf_in[]){
   stats_t stats={0,0,0};
   int i;
-  double t,v,w,l,u,epsilon,xtol,rtol,x;
+  double t,v,w,l,u,epsilon,xtol,rtol,x,mu,var;
   v=pdf_in[0];
   w=pdf_in[0];
   for(i=2;i<2*N;i+=2){
@@ -244,8 +245,9 @@ double secular(double pdf_in[]){
   l=-1/w;
   u=-1/v;
   epsilon=1e-9;
-  xtol=2e-12; // scipy defaults
-  rtol=8.881784197001252e-16;
+  //  xtol=DBL_MIN;
+  xtol=0.0;
+  rtol=4*DBL_EPSILON;
   x=brentq(f,l+epsilon,u-epsilon,xtol,rtol,1000,&stats,(void*)pdf_in);
   assert(stats.error_num==0);
   return x;

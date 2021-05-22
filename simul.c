@@ -230,9 +230,9 @@ double secular(double pdf_in[]){
   stats_t stats={0,0,0};
   int i;
   double t,v,w,l,u,epsilon,xtol,rtol,x,mu,var;
-  v=pdf_in[0];
-  w=pdf_in[0];
-  for(i=2;i<2*N;i+=2){
+  v=INFINITY;
+  w=-INFINITY;
+  for(i=0;i<2*N;i+=2){
     t=pdf_in[i];
     if(t<v){
       v=t;

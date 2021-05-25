@@ -170,10 +170,10 @@ brentq (callback_type f, double xa, double xb, double xtol, double rtol,
 #define CONTINUE 2
 
 /*
-    Probality distributions (generally having a name starting with
-    "pdf") are represented by an array[2*N] consisting of pairs
-    (ai,pi), i=1,...,N.  It is usually assumed that the ai are strictly
-    ascending and p1>0, pN>0.
+  Probality distributions (generally having a name starting with
+  "pdf") are represented by an array[2*N] consisting of pairs
+  (ai,pi), i=1,...,N.  It is usually assumed that the ai are strictly
+  ascending and p1>0, pN>0.
 */
 
 double L_ (double x) {
@@ -246,6 +246,13 @@ double f (double y, void *args) {
 }
 
 void secular (double pdf_in[], double pdf_out[]) {
+  /*
+    Solves the secular equation sum_i pi*ai/(1+x*ai)=0 and
+    returns ai->pi/(1+x*ai).
+    
+    In order to avoid catastropic cancellation x is internally
+    represented as a sum x=y+b.
+  */
     stats_t stats = { 0, 0, 0 };
     int i;
     double t, v, w, l, ll, u, uu, b, epsilon, xtol, rtol, mu, a, p, y;
@@ -303,18 +310,18 @@ void secular (double pdf_in[], double pdf_out[]) {
 }
 
 void MLE_expected (double pdf_in[], double s, double pdf_out[]) {
-    /*
-       This function computes the maximum likelood estimate for a
-       discrete distribution with expectation value s, given an observed
-       (i.e. empirical) distribution pdf_in.
-
-       The theory behind this function can be found in the online 
-       document
-
-       http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
-
-       (see Proposition 1.1).
-     */
+  /*
+    This function computes the maximum likelood estimate for a
+    discrete distribution with expectation value s, given an observed
+    (i.e. empirical) distribution pdf_in.
+    
+    The theory behind this function can be found in the online 
+    document
+    
+    http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
+    
+    (see Proposition 1.1).
+  */
     double p, a, mu, var;
     int i;
     double pdf1[2 * N], pdf2[2 * N];
@@ -347,10 +354,10 @@ void uniform (double pdf_in[], double pdf_out[]) {
 }
 
 void MLE_t_value (double pdf_in[], double ref, double s, double pdf_out[]) {
-    /*
-       See https://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
-       Section 4.1
-     */
+  /*
+    See https://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
+    Section 4.1
+  */
 
     double pdf_[2 * N], pdf1[2 * N], pdf2[2 * N];
     double sigma;;
@@ -388,9 +395,9 @@ void MLE_t_value (double pdf_in[], double ref, double s, double pdf_out[]) {
 }
 
 double myrand (uint64_t * prng) {
-    /*
-       https://nuclear.llnl.gov/CNP/rng/rngman/node4.html
-     */
+  /*
+    https://nuclear.llnl.gov/CNP/rng/rngman/node4.html
+  */
     uint64_t a = UINT64_C (2862933555777941757);
     uint64_t b = UINT64_C (3037000493);
     uint64_t current = *prng;
@@ -452,13 +459,13 @@ double LLR_t_value (double pdf_in[], double ref, double s0, double s1) {
 }
 
 double LLR_alt (double pdf_in[], double s0, double s1) {
-    /*
-       This function computes the approximate generalized log likelihood ratio (divided by N)
-       for s=s1 versus s=s0 where pdf is an empirical distribution and
-       s is the expectation value of the true distribution.
-
-       http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
-     */
+  /*
+    This function computes the approximate generalized log likelihood ratio (divided by N)
+    for s=s1 versus s=s0 where pdf is an empirical distribution and
+    s is the expectation value of the true distribution.
+    
+    http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
+  */
     int i;
     double p, v, r0 = 0.0, r1 = 0.0;
     for (i = 0; i < N; i++) {
@@ -471,10 +478,10 @@ double LLR_alt (double pdf_in[], double s0, double s1) {
 }
 
 void regularize (int results_in[], double results_out[]) {
-    /* 
-       Replace zeros with a small value to avoid division by
-       zero issues.
-     */
+  /* 
+     Replace zeros with a small value to avoid division by
+     zero issues.
+  */
     double epsilon = 1e-10;
     int i;
     for (i = 0; i < N; i++) {
@@ -502,11 +509,11 @@ void results_to_pdf (int results_in[], double *count, double pdf_out[]) {
 }
 
 double LLR_logistic (double s0, double s1, int results_in[]) {
-    /*
-       This function computes the generalized log-likelihood ratio for
-       "results_in" which should be an array of length 5 containing the
-       frequencies of the game pairs LL,LD+DL,LW+DD+WL,DW+WD,WW.
-     */
+  /*
+    This function computes the generalized log-likelihood ratio for
+    "results_in" which should be an array of length 5 containing the
+    frequencies of the game pairs LL,LD+DL,LW+DD+WL,DW+WD,WW.
+  */
     double pdf_out[2 * N];
     double count;
     results_to_pdf (results_in, &count, pdf_out);
@@ -514,11 +521,11 @@ double LLR_logistic (double s0, double s1, int results_in[]) {
 }
 
 double LLR_normalized (double nt0, double nt1, int results_in[]) {
-    /*
-       Like LLR_logistic but using normalized t-values.
-       See Section 4.1 in
-       http://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
-     */
+  /*
+    Like LLR_logistic but using normalized t-values.
+    See Section 4.1 in
+    http://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
+  */
     double pdf_out[2 * N];
     double count;
     double t0, t1;
@@ -539,10 +546,10 @@ double LLR_normalized (double nt0, double nt1, int results_in[]) {
 }
 
 double LLR_normalized_alt (double nt0, double nt1, int results_in[]) {
-    /*
-       See Section 4.2 in
-       http://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
-     */
+  /*
+    See Section 4.2 in
+    http://hardy.uhasselt.be/Fishtest/normalized_elo_practical.pdf
+  */
     double pdf_out[2 * N];
     double count;
     double mu, var, sigma_pg, games, nt;
@@ -578,10 +585,10 @@ double LLR_normalized_alt (double nt0, double nt1, int results_in[]) {
 */
 
 void proba_to_bayeselo (double P[], double *belo, double *drawelo) {
-    /*
-       Takes a probability: P[2], P[0]
-       Returns elo, drawelo.
-     */
+  /*
+    Takes a probability: P[2], P[0]
+    Returns elo, drawelo.
+  */
     assert (0 < P[2] && P[2] < 1 && 0 < P[0] && P[0] < 1);
     *belo = 200 * log10 (P[2] / P[0] * (1 - P[0]) / (1 - P[2]));
     *drawelo = 200 * log10 ((1 - P[0]) / P[0] * (1 - P[2]) / P[2]);

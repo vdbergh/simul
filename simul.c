@@ -188,10 +188,10 @@ void disp (double pdf[]) {
     int i;
     printf ("[");
     for (i = 0; i < N - 1; i++) {
-	printf ("(%f,%f), ", pdf[2 * i], pdf[2 * i + 1]);
+	printf ("(%.16g,%.16g), ", pdf[2 * i], pdf[2 * i + 1]);
     }
     i = N - 1;
-    printf ("(%f,%f)]\n", pdf[2 * i], pdf[2 * i + 1]);
+    printf ("(%.16g,%.16g)]\n", pdf[2 * i], pdf[2 * i + 1]);
 }
 
 void muvar (double pdf_in[], double *mu, double *var) {
@@ -360,11 +360,12 @@ void MLE_t_value (double pdf_in[], double ref, double s, double pdf_out[]) {
   */
 
     double pdf_[2 * N], pdf1[2 * N], pdf2[2 * N];
-    double sigma;;
-    double mu, var, a, p, m, d;
+    double sigma;
+    double mu, var, a, p, m;
     int i, j;
+    int converged=0;
     uniform (pdf_in, pdf_out);
-    for (i = 0; i < 10; i++) {
+    for (i = 0; i < 1000; i++) {
 	memcpy (pdf_, pdf_out, 2 * N * sizeof (double));
 	muvar (pdf_out, &mu, &var);
 	sigma = sqrt (var);
@@ -381,17 +382,19 @@ void MLE_t_value (double pdf_in[], double ref, double s, double pdf_out[]) {
 	}
 	m = 0;
 	for (j = 0; j < N; j++) {
-	    d = fabs (pdf_[2 * j + 1] - pdf_out[2 * j + 1]);
-	    if (d > m) {
-		m = d;
-	    }
+	    m += pdf_in[2 * j +1]*log (pdf_[2 * j + 1] / pdf_out[2 * j + 1]);
 	}
-	if (m < 1e-9) {
+	m=fabs(m);
+	m+=fabs (s - (mu - ref) / sqrt (var));
+	if (fabs(m) < 1e-12) {
+	    converged=1;
 	    break;
 	}
     }
-    muvar (pdf_out, &mu, &var);
-    assert (fabs (s - (mu - ref) / sqrt (var)) < 1e-5);
+    if(!converged){
+      disp(pdf_in);
+    }
+    assert(converged);
 }
 
 double myrand (uint64_t * prng) {
@@ -482,7 +485,7 @@ void regularize (int results_in[], double results_out[]) {
      Replace zeros with a small value to avoid division by
      zero issues.
   */
-    double epsilon = 1e-10;
+    double epsilon = 1e-16;
     int i;
     for (i = 0; i < N; i++) {
 	if (results_in[i] == 0) {

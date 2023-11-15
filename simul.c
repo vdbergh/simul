@@ -8,6 +8,9 @@
 #include <time.h>
 #include <string.h>
 #include <inttypes.h>
+#include <gsl/gsl_sf_erf.h>
+#include <gsl/gsl_roots.h>
+#include <gsl/gsl_errno.h>
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_THREADS 128
@@ -33,6 +36,8 @@ int nproc(void){
   return nproc_;
 }
 
+#define phi(x) gsl_sf_erf_Z(x)
+#define Phi(x) (1-gsl_sf_erf_Q(x))
 
 typedef struct {
     int funcalls;
@@ -44,123 +49,63 @@ typedef struct {
 #define CONVERR -2
 
 typedef double (*callback_type)(double,void*);
+//extern double brentq(callback_type f, double xa, double xb, double xtol, double rtol, int iter, stats_t *stats, void *args);
 
-/* This is a slightly modified version of brentq provided by SciPy */
+typedef struct {
+  callback_type f;
+  int funcalls;
+  void *args;
+} callback_wrapper_t;
 
-/* Written by Charles Harris charles.harris@sdl.usu.edu */
-
-/*
-  At the top of the loop the situation is the following:
-    1. the root is bracketed between xa and xb
-    2. xa is the most recent estimate
-    3. xp is the previous estimate
-    4. |fp| < |fb|
-  The order of xa and xp doesn't matter, but assume xp < xb. Then xa lies to
-  the right of xp and the assumption is that xa is increasing towards the root.
-  In this situation we will attempt quadratic extrapolation as long as the
-  condition
-  *  |fa| < |fp| < |fb|
-  is satisfied. That is, the function value is decreasing as we go along.
-  Note the 4 above implies that the right inequlity already holds.
-  The first check is that xa is still to the left of the root. If not, xb is
-  replaced by xp and the interval reverses, with xb < xa. In this situation
-  we will try linear interpolation. That this has happened is signaled by the
-  equality xb == xp;
-  The second check is that |fa| < |fb|. If this is not the case, we swap
-  xa and xb and resort to bisection.
-*/
-
-double
-brentq(callback_type f, double xa, double xb, double xtol, double rtol,
-       int iter, stats_t *stats, void* args)
-{
-    double xpre = xa, xcur = xb;
-    double xblk = 0., fpre, fcur, fblk = 0., spre = 0., scur = 0., sbis;
-    /* the tolerance is 2*delta */
-    double delta;
-    double stry, dpre, dblk;
-    int i;
-
-    fpre = (*f)(xpre, args);
-    fcur = (*f)(xcur, args);
-    stats->funcalls = 2;
-    if (fpre*fcur > 0) {
-        stats->error_num = SIGNERR;
-        return 0.;
-    }
-    if (fpre == 0) {
-        return xpre;
-    }
-    if (fcur == 0) {
-        return xcur;
-    }
-
-    stats->iterations = 0;
-    for (i = 0; i < iter; i++) {
-        stats->iterations++;
-        if (fpre*fcur < 0) {
-            xblk = xpre;
-            fblk = fpre;
-            spre = scur = xcur - xpre;
-        }
-        if (fabs(fblk) < fabs(fcur)) {
-            xpre = xcur;
-            xcur = xblk;
-            xblk = xpre;
-
-            fpre = fcur;
-            fcur = fblk;
-            fblk = fpre;
-        }
-
-        delta = (xtol + rtol*fabs(xcur))/2;
-        sbis = (xblk - xcur)/2;
-        if (fcur == 0 || fabs(sbis) < delta) {
-            return xcur;
-        }
-
-        if (fabs(spre) > delta && fabs(fcur) < fabs(fpre)) {
-            if (xpre == xblk) {
-                /* interpolate */
-                stry = -fcur*(xcur - xpre)/(fcur - fpre);
-            }
-            else {
-                /* extrapolate */
-                dpre = (fpre - fcur)/(xpre - xcur);
-                dblk = (fblk - fcur)/(xblk - xcur);
-                stry = -fcur*(fblk*dblk - fpre*dpre)
-                    /(dblk*dpre*(fblk - fpre));
-            }
-            if (2*fabs(stry) < MIN(fabs(spre), 3*fabs(sbis) - delta)) {
-                /* good short step */
-                spre = scur;
-                scur = stry;
-            } else {
-                /* bisect */
-                spre = sbis;
-                scur = sbis;
-            }
-        }
-        else {
-            /* bisect */
-            spre = sbis;
-            scur = sbis;
-        }
-
-        xpre = xcur; fpre = fcur;
-        if (fabs(scur) > delta) {
-            xcur += scur;
-        }
-        else {
-            xcur += (sbis > 0 ? delta : -delta);
-        }
-
-        fcur = (*f)(xcur, args);
-        stats->funcalls++;
-    }
-    stats->error_num = CONVERR;
-    return xcur;
+double callback_wrapper(double x, void *args){
+  callback_wrapper_t *c=(callback_wrapper_t *)(args);
+  c->funcalls++;
+  return (*(c->f))(x,c->args);
 }
+
+double brentq(callback_type f, double xa, double xb, double xtol, double rtol, int iter, stats_t *stats, void *args){
+  int status;
+  const gsl_root_fsolver_type *T;
+  gsl_root_fsolver *s;
+  double r = 0;
+  gsl_function F;
+  callback_wrapper_t c;
+  c.f=f;
+  c.funcalls=0;
+  c.args=args;
+  stats->error_num  = CONVERR;
+  stats->iterations = 0;
+  F.function = callback_wrapper;
+  F.params = (void *)(&c);
+  T = gsl_root_fsolver_brent;
+  s = gsl_root_fsolver_alloc (T);
+  gsl_set_error_handler_off();
+  status=gsl_root_fsolver_set (s, &F, xa, xb);
+  if(status==GSL_EINVAL){
+    stats->error_num=SIGNERR;
+  }else{
+    assert(status==GSL_SUCCESS);
+    status=GSL_CONTINUE;
+  }
+  for(int i=0;i<iter && status==GSL_CONTINUE;i++){
+    stats->iterations++;
+    status=gsl_root_fsolver_iterate (s);
+    assert(status==GSL_SUCCESS);
+    r = gsl_root_fsolver_root (s);
+    xa = gsl_root_fsolver_x_lower (s);
+    xb = gsl_root_fsolver_x_upper (s);
+    status = gsl_root_test_interval (xa, xb, xtol, rtol);
+    if (status == GSL_SUCCESS){
+      stats->error_num=0;
+      break;
+    }
+    assert(status==GSL_CONTINUE);
+  }
+  stats->funcalls=c.funcalls;
+  gsl_root_fsolver_free (s);
+  return r;
+}
+
 
 #define N 5
 #define H0 0
@@ -210,6 +155,27 @@ void muvar(double pdf_in[], double *mu, double *var){
   } 
   assert(fabs(sum-1)<epsilon);
   *var=sum2-(*mu)*(*mu);
+}
+
+
+double ucp(double mu, double var, int batch, double delta) {
+  double mu_ = batch * mu;
+  double var_ = batch * var;
+  double sigma_ = sqrt(var_);
+  double delta_z=(delta-mu_)/sigma_;
+  double o,p;
+  if(delta<=0){
+    p=0.0;
+  }else if(delta_z >= 5){
+    p=1.0;
+  }else if(delta_z <= -5){
+    p=delta/mu_;
+  }else{
+    o = sigma_*(phi(delta_z)-delta_z*(1-Phi(delta_z)));
+    p=delta/(o+delta);
+  }
+  // assert(p>=0 && p<=1);
+  return p;
 }
 
 double f(double x, void *args){
@@ -382,6 +348,22 @@ double LLR_expected(double pdf_in[], double s0, double s1){
   return sum;
 }
 
+void LLRjumps_expected(double pdf_in[], double s0, double s1, double pdf_out[])
+{
+  double pdf0[2*N], pdf1[2*N];
+  double p,p0,p1;
+  int i;
+  MLE_expected(pdf_in,s0,pdf0);
+  MLE_expected(pdf_in,s1,pdf1);
+  for(i=0;i<N;i++){
+    p=pdf_in[2*i+1];
+    p0=pdf0[2*i+1];
+    p1=pdf1[2*i+1];
+    pdf_out[2*i]=log(p1/p0);
+    pdf_out[2*i+1]=p;
+  }
+}
+
 double LLR_t_value(double pdf_in[], double ref, double s0, double s1){
   double pdf0[2*N], pdf1[2*N];
   double p,p0,p1;
@@ -397,6 +379,24 @@ double LLR_t_value(double pdf_in[], double ref, double s0, double s1){
   }
   return sum;
 }
+
+void LLRjumps_t_value(double pdf_in[], double ref ,double s0, double s1, double pdf_out[])
+{
+  double pdf0[2*N], pdf1[2*N];
+  double p,p0,p1;
+  int i;
+  MLE_t_value(pdf_in,ref,s0,pdf0);
+  MLE_t_value(pdf_in,ref,s1,pdf1);
+  for(i=0;i<N;i++){
+    p=pdf_in[2*i+1];
+    p0=pdf0[2*i+1];
+    p1=pdf1[2*i+1];
+    pdf_out[2*i]=log(p1/p0);
+    pdf_out[2*i+1]=p;
+  }
+}
+
+
 
 double LLR_alt(double pdf_in[], double s0, double s1){
   /*
@@ -652,35 +652,61 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
     if((*duration)%batch!=0){
       continue;
     }
+    double count;
+    double pdf2[2*N];
+    double pdf3[2*N];
+    double mu;
+    double var;
+    results_to_pdf(results, &count, pdf2);
     if(elo_model==ELO_LOGISTIC){
-      LLR_=LLR_logistic(score0,score1,results);
+      LLRjumps_expected(pdf2, score0, score1, pdf3);
     }else if(elo_model==ELO_NORMALIZED){
-      LLR_=LLR_normalized(score0,score1,results);
+      LLRjumps_t_value(pdf2, 0.5, score0, score1, pdf3);
     }else{
       assert(0);
     }
-    /* 
-       Dynamic overshoot correction using
-       Siegmund - Sequential Analysis - Corollary 8.33.
-    */
-    if(LLR_>max_LLR){
-      sq1+=(LLR_-max_LLR)*(LLR_-max_LLR);
-      max_LLR=LLR_;
-      o1=sq1/LLR_/2;
-    }
-    if(LLR_<min_LLR) {
-      sq0+=(LLR_-min_LLR)*(LLR_-min_LLR);
-      min_LLR=LLR_;
-      o0=-sq0/LLR_/2;
-    }
-    assert(overshoot==0 || overshoot==1);
-    if(!overshoot){
-       o0=0;o1=0;
-    }
-    if(LLR_>LB-o1){
-      *status=H1;
-    }else if(LLR_ < LA+o0){
-      *status=H0;
+    muvar(pdf3, &mu, &var);
+    LLR_=count*mu;
+    if(overshoot==0){
+      if(LLR_>LB){
+	*status=H1;
+      }else if(LLR_ < LA){
+	*status=H0;
+      }
+    }else if(overshoot==1){
+      /*
+	https://hardy.uhasselt.be/Fishtest/stochastic_stopping.pdf
+       */
+      double p_upper = ucp(mu, var, batch, LB-LLR_);
+      double p_lower = ucp(-mu, var, batch, LLR_-LA);
+      double u = myrand(prng);
+      if(u>=p_upper){
+	*status=H1;
+      }else if(u>=p_lower){
+	*status=H0;
+      }
+    }else if(overshoot==2){
+      /* 
+	 Dynamic overshoot correction using
+	 Siegmund - Sequential Analysis - Corollary 8.33.
+      */
+	if(LLR_>max_LLR){
+	sq1+=(LLR_-max_LLR)*(LLR_-max_LLR);
+	max_LLR=LLR_;
+	o1=sq1/LLR_/2;
+	}
+	if(LLR_<min_LLR) {
+	sq0+=(LLR_-min_LLR)*(LLR_-min_LLR);
+	min_LLR=LLR_;
+	o0=-sq0/LLR_/2;
+	}
+	if(LLR_>LB-o1){
+	*status=H1;
+	}else if(LLR_ < LA+o0){
+	*status=H0;
+	}
+    }else{
+      assert(0);
     }
     if(*status!=CONTINUE){
       /* The GSPRT does not work well with very low outcome values */
@@ -744,7 +770,7 @@ void *sim_function(void *args){
 
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
-	 "[--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
+	 "[--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--ovcor ALGORITHM] "
 	 "[--threads THREADS] [--truncate TRUNCATE] [--batch BATCH] "
 	 "[--elo_model ELO_MODEL] "
          "[--seed SEED]\n");
@@ -897,14 +923,20 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
-    }else if(strcmp(argv[i],"--noovcor")==0){
-      overshoot=0;
-    }else{
+    }else if(strcmp(argv[i],"--ovcor")==0){
+      if(i<argc-1){
+	overshoot=atoi(argv[i+1]);
+	i++;
+      }else{
+	usage();
+	return 0;
+      }
+    } else {
       usage();
       return 0;
     }
   }
-  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1)||batch<=0){
+  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1 || overshoot==2)||batch<=0){
     usage();
     return 0;
   }

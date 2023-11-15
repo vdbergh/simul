@@ -124,10 +124,10 @@ A `SPRT(0,5)`  with bounds expressed in normalized Elo (the above sample case) t
 | --draw_ratio | Draw ratio between equal strength engines | 0.61 |
 | --bias       | A proxy for `RMS bias` | 0 |
 | --batch      | LLR calculation frequency |1 game pair|
-| --noovcor       | A flag to disable dynamic overshoot correction |
+| --ovcor       | Choose the discrete time correction algorithm | 1 |
 | --threads       | Simultaneous runs |# of CPUs |
 | --truncate      | Stop the simulation after this many runs |run forever|
 | --elo_model     | logistic or normalized | logistic |
 | --seed      | Seed for the random number generator| time(0) |
 
-
+For a description of the default overshoot correction algorithm see [here](doc/stochastic_stopping.md) .

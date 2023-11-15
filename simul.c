@@ -8,6 +8,7 @@
 #include <time.h>
 #include <string.h>
 #include <inttypes.h>
+#include <gsl/gsl_sf_erf.h>
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_THREADS 128
@@ -33,6 +34,8 @@ int nproc(void){
   return nproc_;
 }
 
+#define phi(x) gsl_sf_erf_Z(x)
+#define Phi(x) (1-gsl_sf_erf_Q(x))
 
 typedef struct {
     int funcalls;
@@ -212,6 +215,27 @@ void muvar(double pdf_in[], double *mu, double *var){
   *var=sum2-(*mu)*(*mu);
 }
 
+
+double ucp(double mu, double var, int batch, double delta) {
+  double mu_ = batch * mu;
+  double var_ = batch * var;
+  double sigma_ = sqrt(var_);
+  double delta_z=(delta-mu_)/sigma_;
+  double o,p;
+  if(delta<=0){
+    p=1.0;
+  }else if(delta_z >= 5){
+    p=1.0;
+  }else if(delta_z <= -5){
+    p=delta/mu_;
+  }else{
+    o = sigma_*(phi(delta_z)-delta_z*(1-Phi(delta_z)));
+    p=delta/(o+delta);
+  }
+  // assert(p>=0 && p<=1);
+  return p;
+}
+
 double f(double x, void *args){
   int i;
   double a,p;
@@ -382,6 +406,23 @@ double LLR_expected(double pdf_in[], double s0, double s1){
   return sum;
 }
 
+double LLRjumps_expected(double pdf_in[], double s0, double s1, double pdf_out[])
+{
+  double pdf0[2*N], pdf1[2*N];
+  double p,p0,p1;
+  double sum=0.0;
+  int i;
+  MLE_expected(pdf_in,s0,pdf0);
+  MLE_expected(pdf_in,s1,pdf1);
+  for(i=0;i<N;i++){
+    p=pdf_in[2*i+1];
+    p0=pdf0[2*i+1];
+    p1=pdf1[2*i+1];
+    pdf_out[2*i]=log(p1/p0);
+    pdf_out[2*i+1]=p;
+  }
+}
+
 double LLR_t_value(double pdf_in[], double ref, double s0, double s1){
   double pdf0[2*N], pdf1[2*N];
   double p,p0,p1;
@@ -397,6 +438,25 @@ double LLR_t_value(double pdf_in[], double ref, double s0, double s1){
   }
   return sum;
 }
+
+double LLRjumps_t_value(double pdf_in[], double ref ,double s0, double s1, double pdf_out[])
+{
+  double pdf0[2*N], pdf1[2*N];
+  double p,p0,p1;
+  double sum=0.0;
+  int i;
+  MLE_t_value(pdf_in,ref,s0,pdf0);
+  MLE_t_value(pdf_in,ref,s1,pdf1);
+  for(i=0;i<N;i++){
+    p=pdf_in[2*i+1];
+    p0=pdf0[2*i+1];
+    p1=pdf1[2*i+1];
+    pdf_out[2*i]=log(p1/p0);
+    pdf_out[2*i+1]=p;
+  }
+}
+
+
 
 double LLR_alt(double pdf_in[], double s0, double s1){
   /*
@@ -652,35 +712,62 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
     if((*duration)%batch!=0){
       continue;
     }
+    double count;
+    double pdf2[2*N];
+    double pdf3[2*N];
+    double mu;
+    double var;
+    results_to_pdf(results, &count, pdf2);
     if(elo_model==ELO_LOGISTIC){
-      LLR_=LLR_logistic(score0,score1,results);
+      LLRjumps_expected(pdf2, score0, score1, pdf3);
     }else if(elo_model==ELO_NORMALIZED){
-      LLR_=LLR_normalized(score0,score1,results);
+      LLRjumps_t_value(pdf2, 0.5, score0, score1, pdf3);
     }else{
       assert(0);
     }
-    /* 
-       Dynamic overshoot correction using
-       Siegmund - Sequential Analysis - Corollary 8.33.
-    */
-    if(LLR_>max_LLR){
-      sq1+=(LLR_-max_LLR)*(LLR_-max_LLR);
-      max_LLR=LLR_;
-      o1=sq1/LLR_/2;
-    }
-    if(LLR_<min_LLR) {
-      sq0+=(LLR_-min_LLR)*(LLR_-min_LLR);
-      min_LLR=LLR_;
-      o0=-sq0/LLR_/2;
-    }
-    assert(overshoot==0 || overshoot==1);
-    if(!overshoot){
-       o0=0;o1=0;
-    }
-    if(LLR_>LB-o1){
-      *status=H1;
-    }else if(LLR_ < LA+o0){
-      *status=H0;
+    muvar(pdf3, &mu, &var);
+    LLR_=count*mu;
+    if(overshoot==0){
+      if(LLR_>LB){
+	*status=H1;
+      }else if(LLR_ < LA){
+	*status=H0;
+      }
+    }else if(overshoot==1){
+      double p_upper = ucp(mu, var, batch, LB-LLR_);
+      double p_lower = ucp(-mu, var, batch, LLR_-LA);
+      double u = myrand(prng);
+      if(LLR_>LB || u>=p_upper){
+	*status=H1;
+      }else if(LLR_ < LA || u>=p_lower){
+	*status=H0;
+      }
+    }else if(overshoot==2){
+      /* 
+	 Dynamic overshoot correction using
+	 Siegmund - Sequential Analysis - Corollary 8.33.
+      */
+	if(LLR_>max_LLR){
+	sq1+=(LLR_-max_LLR)*(LLR_-max_LLR);
+	max_LLR=LLR_;
+	o1=sq1/LLR_/2;
+	}
+	if(LLR_<min_LLR) {
+	sq0+=(LLR_-min_LLR)*(LLR_-min_LLR);
+	min_LLR=LLR_;
+	o0=-sq0/LLR_/2;
+	}
+	assert(overshoot==0 || overshoot==1);
+	if(!overshoot){
+	o0=0;o1=0;
+	}
+	if(LLR_>LB-o1){
+	*status=H1;
+	}else if(LLR_ < LA+o0){
+	*status=H0;
+	}
+    }else{
+      assert(0);
     }
     if(*status!=CONTINUE){
       /* The GSPRT does not work well with very low outcome values */

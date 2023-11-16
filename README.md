@@ -130,4 +130,4 @@ A `SPRT(0,5)`  with bounds expressed in normalized Elo (the above sample case) t
 | --elo_model     | logistic or normalized | logistic |
 | --seed      | Seed for the random number generator| time(0) |
 
-
+For a description of the default overshoot correction algorithm see <doc/stochastic_stopping.md>.

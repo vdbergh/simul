@@ -165,7 +165,7 @@ double ucp(double mu, double var, int batch, double delta) {
   double delta_z=(delta-mu_)/sigma_;
   double o,p;
   if(delta<=0){
-    p=1.0;
+    p=0.0;
   }else if(delta_z >= 5){
     p=1.0;
   }else if(delta_z <= -5){
@@ -677,9 +677,9 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
       double p_upper = ucp(mu, var, batch, LB-LLR_);
       double p_lower = ucp(-mu, var, batch, LLR_-LA);
       double u = myrand(prng);
-      if(LLR_>LB || u>=p_upper){
+      if(u>=p_upper){
 	*status=H1;
-      }else if(LLR_ < LA || u>=p_lower){
+      }else if(u>=p_lower){
 	*status=H0;
       }
     }else if(overshoot==2){

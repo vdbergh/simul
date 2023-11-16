@@ -757,7 +757,6 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
 	min_LLR=LLR_;
 	o0=-sq0/LLR_/2;
 	}
-	assert(overshoot==0 || overshoot==1);
 	if(!overshoot){
 	o0=0;o1=0;
 	}
@@ -831,7 +830,7 @@ void *sim_function(void *args){
 
 void usage(){
   printf("simul [-h] [--alpha ALPHA] [--beta BETA] [--elo0 ELO0] [--elo1 ELO1] "
-	 "[--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--noovcor] "
+	 "[--elo ELO] [--draw_ratio DRAW_RATIO] [--bias BIAS] [--ovcor ALGORITHM] "
 	 "[--threads THREADS] [--truncate TRUNCATE] [--batch BATCH] "
 	 "[--elo_model ELO_MODEL] "
          "[--seed SEED]\n");
@@ -984,14 +983,17 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
-    }else if(strcmp(argv[i],"--noovcor")==0){
-      overshoot=0;
-    }else{
-      usage();
-      return 0;
+    }else if(strcmp(argv[i],"--ovcor")==0){
+      if(i<argc-1){
+	overshoot=atoi(argv[i+1]);
+	i++;
+      }else{
+	usage();
+	return 0;
+      }
     }
   }
-  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1)||batch<=0){
+  if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1 || overshoot==2)||batch<=0){
     usage();
     return 0;
   }

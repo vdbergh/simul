@@ -757,9 +757,6 @@ void simulate(uint64_t *prng,double alpha,double beta,double elo0,double elo1,in
 	min_LLR=LLR_;
 	o0=-sq0/LLR_/2;
 	}
-	if(!overshoot){
-	o0=0;o1=0;
-	}
 	if(LLR_>LB-o1){
 	*status=H1;
 	}else if(LLR_ < LA+o0){

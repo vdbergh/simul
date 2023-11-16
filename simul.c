@@ -348,11 +348,10 @@ double LLR_expected(double pdf_in[], double s0, double s1){
   return sum;
 }
 
-double LLRjumps_expected(double pdf_in[], double s0, double s1, double pdf_out[])
+void LLRjumps_expected(double pdf_in[], double s0, double s1, double pdf_out[])
 {
   double pdf0[2*N], pdf1[2*N];
   double p,p0,p1;
-  double sum=0.0;
   int i;
   MLE_expected(pdf_in,s0,pdf0);
   MLE_expected(pdf_in,s1,pdf1);
@@ -381,11 +380,10 @@ double LLR_t_value(double pdf_in[], double ref, double s0, double s1){
   return sum;
 }
 
-double LLRjumps_t_value(double pdf_in[], double ref ,double s0, double s1, double pdf_out[])
+void LLRjumps_t_value(double pdf_in[], double ref ,double s0, double s1, double pdf_out[])
 {
   double pdf0[2*N], pdf1[2*N];
   double p,p0,p1;
-  double sum=0.0;
   int i;
   MLE_t_value(pdf_in,ref,s0,pdf0);
   MLE_t_value(pdf_in,ref,s1,pdf1);

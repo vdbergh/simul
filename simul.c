@@ -9,6 +9,8 @@
 #include <string.h>
 #include <inttypes.h>
 #include <gsl/gsl_sf_erf.h>
+#include <gsl/gsl_roots.h>
+#include <gsl/gsl_errno.h>
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_THREADS 128
@@ -47,123 +49,63 @@ typedef struct {
 #define CONVERR -2
 
 typedef double (*callback_type)(double,void*);
+//extern double brentq(callback_type f, double xa, double xb, double xtol, double rtol, int iter, stats_t *stats, void *args);
 
-/* This is a slightly modified version of brentq provided by SciPy */
+typedef struct {
+  callback_type f;
+  int funcalls;
+  void *args;
+} callback_wrapper_t;
 
-/* Written by Charles Harris charles.harris@sdl.usu.edu */
-
-/*
-  At the top of the loop the situation is the following:
-    1. the root is bracketed between xa and xb
-    2. xa is the most recent estimate
-    3. xp is the previous estimate
-    4. |fp| < |fb|
-  The order of xa and xp doesn't matter, but assume xp < xb. Then xa lies to
-  the right of xp and the assumption is that xa is increasing towards the root.
-  In this situation we will attempt quadratic extrapolation as long as the
-  condition
-  *  |fa| < |fp| < |fb|
-  is satisfied. That is, the function value is decreasing as we go along.
-  Note the 4 above implies that the right inequlity already holds.
-  The first check is that xa is still to the left of the root. If not, xb is
-  replaced by xp and the interval reverses, with xb < xa. In this situation
-  we will try linear interpolation. That this has happened is signaled by the
-  equality xb == xp;
-  The second check is that |fa| < |fb|. If this is not the case, we swap
-  xa and xb and resort to bisection.
-*/
-
-double
-brentq(callback_type f, double xa, double xb, double xtol, double rtol,
-       int iter, stats_t *stats, void* args)
-{
-    double xpre = xa, xcur = xb;
-    double xblk = 0., fpre, fcur, fblk = 0., spre = 0., scur = 0., sbis;
-    /* the tolerance is 2*delta */
-    double delta;
-    double stry, dpre, dblk;
-    int i;
-
-    fpre = (*f)(xpre, args);
-    fcur = (*f)(xcur, args);
-    stats->funcalls = 2;
-    if (fpre*fcur > 0) {
-        stats->error_num = SIGNERR;
-        return 0.;
-    }
-    if (fpre == 0) {
-        return xpre;
-    }
-    if (fcur == 0) {
-        return xcur;
-    }
-
-    stats->iterations = 0;
-    for (i = 0; i < iter; i++) {
-        stats->iterations++;
-        if (fpre*fcur < 0) {
-            xblk = xpre;
-            fblk = fpre;
-            spre = scur = xcur - xpre;
-        }
-        if (fabs(fblk) < fabs(fcur)) {
-            xpre = xcur;
-            xcur = xblk;
-            xblk = xpre;
-
-            fpre = fcur;
-            fcur = fblk;
-            fblk = fpre;
-        }
-
-        delta = (xtol + rtol*fabs(xcur))/2;
-        sbis = (xblk - xcur)/2;
-        if (fcur == 0 || fabs(sbis) < delta) {
-            return xcur;
-        }
-
-        if (fabs(spre) > delta && fabs(fcur) < fabs(fpre)) {
-            if (xpre == xblk) {
-                /* interpolate */
-                stry = -fcur*(xcur - xpre)/(fcur - fpre);
-            }
-            else {
-                /* extrapolate */
-                dpre = (fpre - fcur)/(xpre - xcur);
-                dblk = (fblk - fcur)/(xblk - xcur);
-                stry = -fcur*(fblk*dblk - fpre*dpre)
-                    /(dblk*dpre*(fblk - fpre));
-            }
-            if (2*fabs(stry) < MIN(fabs(spre), 3*fabs(sbis) - delta)) {
-                /* good short step */
-                spre = scur;
-                scur = stry;
-            } else {
-                /* bisect */
-                spre = sbis;
-                scur = sbis;
-            }
-        }
-        else {
-            /* bisect */
-            spre = sbis;
-            scur = sbis;
-        }
-
-        xpre = xcur; fpre = fcur;
-        if (fabs(scur) > delta) {
-            xcur += scur;
-        }
-        else {
-            xcur += (sbis > 0 ? delta : -delta);
-        }
-
-        fcur = (*f)(xcur, args);
-        stats->funcalls++;
-    }
-    stats->error_num = CONVERR;
-    return xcur;
+double callback_wrapper(double x, void *args){
+  callback_wrapper_t *c=(callback_wrapper_t *)(args);
+  c->funcalls++;
+  return (*(c->f))(x,c->args);
 }
+
+double brentq(callback_type f, double xa, double xb, double xtol, double rtol, int iter, stats_t *stats, void *args){
+  int status;
+  const gsl_root_fsolver_type *T;
+  gsl_root_fsolver *s;
+  double r = 0;
+  gsl_function F;
+  callback_wrapper_t c;
+  c.f=f;
+  c.funcalls=0;
+  c.args=args;
+  stats->error_num  = CONVERR;
+  stats->iterations = 0;
+  F.function = callback_wrapper;
+  F.params = (void *)(&c);
+  T = gsl_root_fsolver_brent;
+  s = gsl_root_fsolver_alloc (T);
+  gsl_set_error_handler_off();
+  status=gsl_root_fsolver_set (s, &F, xa, xb);
+  if(status==GSL_EINVAL){
+    stats->error_num=SIGNERR;
+  }else{
+    assert(status==GSL_SUCCESS);
+    status=GSL_CONTINUE;
+  }
+  for(int i=0;i<iter && status==GSL_CONTINUE;i++){
+    stats->iterations++;
+    status=gsl_root_fsolver_iterate (s);
+    assert(status==GSL_SUCCESS);
+    r = gsl_root_fsolver_root (s);
+    xa = gsl_root_fsolver_x_lower (s);
+    xb = gsl_root_fsolver_x_upper (s);
+    status = gsl_root_test_interval (xa, xb, xtol, rtol);
+    if (status == GSL_SUCCESS){
+      stats->error_num=0;
+      break;
+    }
+    assert(status==GSL_CONTINUE);
+  }
+  stats->funcalls=c.funcalls;
+  gsl_root_fsolver_free (s);
+  return r;
+}
+
 
 #define N 5
 #define H0 0

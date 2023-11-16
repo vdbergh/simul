@@ -928,6 +928,9 @@ int main(int argc, char **argv){
 	usage();
 	return 0;
       }
+    } else {
+      usage();
+      return 0;
     }
   }
   if(alpha<=0||alpha>=1||beta<=0||beta>=1||elo1<=elo0||!(overshoot==0 || overshoot==1 || overshoot==2)||batch<=0){

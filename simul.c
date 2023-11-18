@@ -809,7 +809,7 @@ int main(int argc, char **argv) {
   double belo, belo0, belo1, draw_elo, advantage;
   double pdf[2 * N], pdf0[2 * N], pdf1[2 * N];
   int num_threads = nproc();
-  int overshoot = 1;
+  int overshoot = 2;
   int elo_model = ELO_LOGISTIC;
   int i;
   sim_t sim_;
